@@ -96,9 +96,7 @@ struct MainView: View {
         }
         // エクスポート
         ToolbarItem(placement: .primaryAction) {
-            Button { exportResults() } label: { Label("エクスポート", systemImage: "square.and.arrow.up") }
-                .keyboardShortcut("s", modifiers: .command)
-                .disabled(viewModel.transcript == nil)
+            EmptyView() // エクスポートは自動保存のため不要
         }
         // 設定（右端）
         ToolbarItem(placement: .primaryAction) {

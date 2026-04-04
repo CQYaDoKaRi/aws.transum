@@ -627,6 +627,8 @@ extension AppViewModel: SystemAudioCaptureDelegate {
     }
 
     func captureDidFail(with error: Error) {
+        // モニタリング中（録音していない時）のエラーは無視
+        guard isCapturingSystemAudio else { return }
         isCapturingSystemAudio = false
         captureAudioLevel = 0
         errorMessage = "システム音声キャプチャ中にエラーが発生しました: \(error.localizedDescription)"

@@ -1,0 +1,425 @@
+{
+  "runtimeTarget": {
+    "name": ".NETCoreApp,Version=v8.0",
+    "signature": ""
+  },
+  "compilationOptions": {},
+  "targets": {
+    ".NETCoreApp,Version=v8.0": {
+      "AudioTranscriptionSummary/1.0.0": {
+        "dependencies": {
+          "AWSSDK.S3": "4.0.20.3",
+          "AWSSDK.TranscribeService": "4.0.5.12",
+          "AWSSDK.TranscribeStreaming": "4.0.6.8",
+          "AWSSDK.Translate": "4.0.1.23",
+          "CommunityToolkit.Mvvm": "8.4.2",
+          "Microsoft.Windows.SDK.BuildTools": "10.0.26100.7705",
+          "Microsoft.WindowsAppSDK": "1.6.250602001",
+          "NAudio": "2.3.0",
+          "Microsoft.Web.WebView2.Core.Projection": "1.0.2651.64",
+          "runtimepack.Microsoft.Windows.SDK.NET.Ref": "10.0.19041.57"
+        },
+        "runtime": {
+          "AudioTranscriptionSummary.dll": {}
+        }
+      },
+      "runtimepack.Microsoft.Windows.SDK.NET.Ref/10.0.19041.57": {
+        "runtime": {
+          "Microsoft.Windows.SDK.NET.dll": {
+            "assemblyVersion": "10.0.19041.38",
+            "fileVersion": "10.0.19041.55"
+          },
+          "WinRT.Runtime.dll": {
+            "assemblyVersion": "2.2.0.0",
+            "fileVersion": "2.2.0.48161"
+          }
+        }
+      },
+      "AWSSDK.Core/4.0.3.27": {
+        "runtime": {
+          "lib/net8.0/AWSSDK.Core.dll": {
+            "assemblyVersion": "4.0.0.0",
+            "fileVersion": "4.0.3.27"
+          }
+        }
+      },
+      "AWSSDK.S3/4.0.20.3": {
+        "dependencies": {
+          "AWSSDK.Core": "4.0.3.27"
+        },
+        "runtime": {
+          "lib/net8.0/AWSSDK.S3.dll": {
+            "assemblyVersion": "4.0.0.0",
+            "fileVersion": "4.0.20.3"
+          }
+        }
+      },
+      "AWSSDK.TranscribeService/4.0.5.12": {
+        "dependencies": {
+          "AWSSDK.Core": "4.0.3.27"
+        },
+        "runtime": {
+          "lib/net8.0/AWSSDK.TranscribeService.dll": {
+            "assemblyVersion": "4.0.0.0",
+            "fileVersion": "4.0.5.12"
+          }
+        }
+      },
+      "AWSSDK.TranscribeStreaming/4.0.6.8": {
+        "dependencies": {
+          "AWSSDK.Core": "4.0.3.27"
+        },
+        "runtime": {
+          "lib/net8.0/AWSSDK.TranscribeStreaming.dll": {
+            "assemblyVersion": "4.0.0.0",
+            "fileVersion": "4.0.6.8"
+          }
+        }
+      },
+      "AWSSDK.Translate/4.0.1.23": {
+        "dependencies": {
+          "AWSSDK.Core": "4.0.3.27"
+        },
+        "runtime": {
+          "lib/net8.0/AWSSDK.Translate.dll": {
+            "assemblyVersion": "4.0.0.0",
+            "fileVersion": "4.0.1.23"
+          }
+        }
+      },
+      "CommunityToolkit.Mvvm/8.4.2": {
+        "runtime": {
+          "lib/net8.0-windows10.0.17763/CommunityToolkit.Mvvm.dll": {
+            "assemblyVersion": "8.4.0.0",
+            "fileVersion": "8.4.2.1"
+          }
+        }
+      },
+      "Microsoft.Web.WebView2/1.0.2651.64": {
+        "runtimeTargets": {
+          "runtimes/win-arm64/native/WebView2Loader.dll": {
+            "rid": "win-arm64",
+            "assetType": "native",
+            "fileVersion": "1.0.2651.64"
+          },
+          "runtimes/win-x64/native/WebView2Loader.dll": {
+            "rid": "win-x64",
+            "assetType": "native",
+            "fileVersion": "1.0.2651.64"
+          },
+          "runtimes/win-x86/native/WebView2Loader.dll": {
+            "rid": "win-x86",
+            "assetType": "native",
+            "fileVersion": "1.0.2651.64"
+          }
+        }
+      },
+      "Microsoft.Windows.SDK.BuildTools/10.0.26100.7705": {},
+      "Microsoft.WindowsAppSDK/1.6.250602001": {
+        "dependencies": {
+          "Microsoft.Web.WebView2": "1.0.2651.64",
+          "Microsoft.Windows.SDK.BuildTools": "10.0.26100.7705"
+        },
+        "runtime": {
+          "lib/net6.0-windows10.0.18362.0/Microsoft.InteractiveExperiences.Projection.dll": {
+            "assemblyVersion": "10.0.0.0",
+            "fileVersion": "10.0.27106.2611"
+          },
+          "lib/net6.0-windows10.0.18362.0/Microsoft.WinUI.dll": {
+            "assemblyVersion": "3.0.0.0",
+            "fileVersion": "3.0.0.2506"
+          },
+          "lib/net6.0-windows10.0.18362.0/Microsoft.Windows.AppLifecycle.Projection.dll": {
+            "assemblyVersion": "1.6.0.0",
+            "fileVersion": "1.6.0.0"
+          },
+          "lib/net6.0-windows10.0.18362.0/Microsoft.Windows.AppNotifications.Builder.Projection.dll": {
+            "assemblyVersion": "1.6.0.0",
+            "fileVersion": "1.6.0.0"
+          },
+          "lib/net6.0-windows10.0.18362.0/Microsoft.Windows.AppNotifications.Projection.dll": {
+            "assemblyVersion": "1.6.0.0",
+            "fileVersion": "1.6.0.0"
+          },
+          "lib/net6.0-windows10.0.18362.0/Microsoft.Windows.ApplicationModel.DynamicDependency.Projection.dll": {
+            "assemblyVersion": "1.6.0.0",
+            "fileVersion": "1.6.0.0"
+          },
+          "lib/net6.0-windows10.0.18362.0/Microsoft.Windows.ApplicationModel.Resources.Projection.dll": {
+            "assemblyVersion": "1.6.0.0",
+            "fileVersion": "1.6.0.0"
+          },
+          "lib/net6.0-windows10.0.18362.0/Microsoft.Windows.ApplicationModel.WindowsAppRuntime.Projection.dll": {
+            "assemblyVersion": "1.6.0.0",
+            "fileVersion": "1.6.0.0"
+          },
+          "lib/net6.0-windows10.0.18362.0/Microsoft.Windows.Management.Deployment.Projection.dll": {
+            "assemblyVersion": "1.6.0.0",
+            "fileVersion": "1.6.0.0"
+          },
+          "lib/net6.0-windows10.0.18362.0/Microsoft.Windows.PushNotifications.Projection.dll": {
+            "assemblyVersion": "1.6.0.0",
+            "fileVersion": "1.6.0.0"
+          },
+          "lib/net6.0-windows10.0.18362.0/Microsoft.Windows.Security.AccessControl.Projection.dll": {
+            "assemblyVersion": "1.6.0.0",
+            "fileVersion": "1.6.0.0"
+          },
+          "lib/net6.0-windows10.0.18362.0/Microsoft.Windows.Storage.Projection.dll": {
+            "assemblyVersion": "1.6.0.0",
+            "fileVersion": "1.6.0.0"
+          },
+          "lib/net6.0-windows10.0.18362.0/Microsoft.Windows.System.Power.Projection.dll": {
+            "assemblyVersion": "1.6.0.0",
+            "fileVersion": "1.6.0.0"
+          },
+          "lib/net6.0-windows10.0.18362.0/Microsoft.Windows.System.Projection.dll": {
+            "assemblyVersion": "1.6.0.0",
+            "fileVersion": "1.6.0.0"
+          },
+          "lib/net6.0-windows10.0.18362.0/Microsoft.Windows.Widgets.Projection.dll": {
+            "assemblyVersion": "1.0.0.0",
+            "fileVersion": "1.0.0.0"
+          },
+          "lib/net6.0-windows10.0.18362.0/Microsoft.WindowsAppRuntime.Bootstrap.Net.dll": {
+            "assemblyVersion": "1.6.0.0",
+            "fileVersion": "1.6.0.0"
+          }
+        },
+        "runtimeTargets": {
+          "runtimes/win-arm64/native/Microsoft.WindowsAppRuntime.Bootstrap.dll": {
+            "rid": "win-arm64",
+            "assetType": "native",
+            "fileVersion": "1.6.0.0"
+          },
+          "runtimes/win-x64/native/Microsoft.WindowsAppRuntime.Bootstrap.dll": {
+            "rid": "win-x64",
+            "assetType": "native",
+            "fileVersion": "1.6.0.0"
+          },
+          "runtimes/win-x86/native/Microsoft.WindowsAppRuntime.Bootstrap.dll": {
+            "rid": "win-x86",
+            "assetType": "native",
+            "fileVersion": "1.6.0.0"
+          }
+        }
+      },
+      "NAudio/2.3.0": {
+        "dependencies": {
+          "NAudio.Asio": "2.3.0",
+          "NAudio.Core": "2.3.0",
+          "NAudio.Midi": "2.3.0",
+          "NAudio.Wasapi": "2.3.0",
+          "NAudio.WinForms": "2.3.0",
+          "NAudio.WinMM": "2.3.0"
+        },
+        "runtime": {
+          "lib/net6.0-windows7.0/NAudio.dll": {
+            "assemblyVersion": "2.3.0.0",
+            "fileVersion": "2.3.0.0"
+          }
+        }
+      },
+      "NAudio.Asio/2.3.0": {
+        "dependencies": {
+          "NAudio.Core": "2.3.0"
+        },
+        "runtime": {
+          "lib/net8.0-windows7.0/NAudio.Asio.dll": {
+            "assemblyVersion": "2.3.0.0",
+            "fileVersion": "2.3.0.0"
+          }
+        }
+      },
+      "NAudio.Core/2.3.0": {
+        "runtime": {
+          "lib/netstandard2.0/NAudio.Core.dll": {
+            "assemblyVersion": "2.3.0.0",
+            "fileVersion": "2.3.0.0"
+          }
+        }
+      },
+      "NAudio.Midi/2.3.0": {
+        "dependencies": {
+          "NAudio.Core": "2.3.0"
+        },
+        "runtime": {
+          "lib/netstandard2.0/NAudio.Midi.dll": {
+            "assemblyVersion": "2.3.0.0",
+            "fileVersion": "2.3.0.0"
+          }
+        }
+      },
+      "NAudio.Wasapi/2.3.0": {
+        "dependencies": {
+          "NAudio.Core": "2.3.0"
+        },
+        "runtime": {
+          "lib/netstandard2.0/NAudio.Wasapi.dll": {
+            "assemblyVersion": "2.3.0.0",
+            "fileVersion": "2.3.0.0"
+          }
+        }
+      },
+      "NAudio.WinForms/2.3.0": {
+        "dependencies": {
+          "NAudio.WinMM": "2.3.0"
+        },
+        "runtime": {
+          "lib/netcoreapp3.1/NAudio.WinForms.dll": {
+            "assemblyVersion": "2.3.0.0",
+            "fileVersion": "2.3.0.0"
+          }
+        }
+      },
+      "NAudio.WinMM/2.3.0": {
+        "dependencies": {
+          "NAudio.Core": "2.3.0"
+        },
+        "runtime": {
+          "lib/net6.0/NAudio.WinMM.dll": {
+            "assemblyVersion": "2.3.0.0",
+            "fileVersion": "2.3.0.0"
+          }
+        }
+      },
+      "Microsoft.Web.WebView2.Core.Projection/1.0.2651.64": {
+        "runtime": {
+          "Microsoft.Web.WebView2.Core.Projection.dll": {
+            "assemblyVersion": "1.0.2651.64",
+            "fileVersion": "1.0.2651.64"
+          }
+        }
+      }
+    }
+  },
+  "libraries": {
+    "AudioTranscriptionSummary/1.0.0": {
+      "type": "project",
+      "serviceable": false,
+      "sha512": ""
+    },
+    "runtimepack.Microsoft.Windows.SDK.NET.Ref/10.0.19041.57": {
+      "type": "runtimepack",
+      "serviceable": false,
+      "sha512": ""
+    },
+    "AWSSDK.Core/4.0.3.27": {
+      "type": "package",
+      "serviceable": true,
+      "sha512": "sha512-hGdpxa7GR2JrfOGI35MWlGCiqq4GlpNDJi0DDvE8lJunboziMFeTCXypvstS5eo0WYdJR9pqHykR53QsjWj7jg==",
+      "path": "awssdk.core/4.0.3.27",
+      "hashPath": "awssdk.core.4.0.3.27.nupkg.sha512"
+    },
+    "AWSSDK.S3/4.0.20.3": {
+      "type": "package",
+      "serviceable": true,
+      "sha512": "sha512-CX/Bu4doaRSuLcaPS5HwOHULbuZl3gBqcr7MZxBIBs1wfjYbKv8vgvDYkBrSpg6fFs7UgmDZ8fT2k6ule8UgBw==",
+      "path": "awssdk.s3/4.0.20.3",
+      "hashPath": "awssdk.s3.4.0.20.3.nupkg.sha512"
+    },
+    "AWSSDK.TranscribeService/4.0.5.12": {
+      "type": "package",
+      "serviceable": true,
+      "sha512": "sha512-34HooYkOOPlCdo6znh7YO12bWNIGsd2qwjO0myYs3XeF9lIjxakot++isX3z4nFs4eOZNah3tTAkyPyRij+1Fg==",
+      "path": "awssdk.transcribeservice/4.0.5.12",
+      "hashPath": "awssdk.transcribeservice.4.0.5.12.nupkg.sha512"
+    },
+    "AWSSDK.TranscribeStreaming/4.0.6.8": {
+      "type": "package",
+      "serviceable": true,
+      "sha512": "sha512-wDX4hU4MRPify8L1mo5wss1AvGe5WgUy50OhI37w7Fm84KCRMXwCi19mJ68JqiQGevL5y7fx8kCDoIMoipvNoQ==",
+      "path": "awssdk.transcribestreaming/4.0.6.8",
+      "hashPath": "awssdk.transcribestreaming.4.0.6.8.nupkg.sha512"
+    },
+    "AWSSDK.Translate/4.0.1.23": {
+      "type": "package",
+      "serviceable": true,
+      "sha512": "sha512-h7UlVuTL3khqqiqJF3CMowy3saNyOmVXNnp+j+e5WizctomjN/HcNDi5c0osaXHmraCZfmJmLe1hO+QR4doaUA==",
+      "path": "awssdk.translate/4.0.1.23",
+      "hashPath": "awssdk.translate.4.0.1.23.nupkg.sha512"
+    },
+    "CommunityToolkit.Mvvm/8.4.2": {
+      "type": "package",
+      "serviceable": true,
+      "sha512": "sha512-WadCzGEc2U+3e20avRLng4qNtt4zoOGWrdUISqJWrHe3/FSnrYjuM5Sb4yQb09LhkBXrrI4Zt3dLKgRMbItsrg==",
+      "path": "communitytoolkit.mvvm/8.4.2",
+      "hashPath": "communitytoolkit.mvvm.8.4.2.nupkg.sha512"
+    },
+    "Microsoft.Web.WebView2/1.0.2651.64": {
+      "type": "package",
+      "serviceable": true,
+      "sha512": "sha512-f5sc/vcAoTCTEW7Nqzp4galAuTRguZViw8ksn+Nx2uskEBPm0/ubzy6gVjvXS/P96jLS89C8T9I0hPc417xpNg==",
+      "path": "microsoft.web.webview2/1.0.2651.64",
+      "hashPath": "microsoft.web.webview2.1.0.2651.64.nupkg.sha512"
+    },
+    "Microsoft.Windows.SDK.BuildTools/10.0.26100.7705": {
+      "type": "package",
+      "serviceable": true,
+      "sha512": "sha512-HhD3TweZMpyor2t7vRJgJrASHJDWcDjYWQB2HSqsYWvpB10K8KgkdmXLtGUoKYwoztyIV2k1vjt1DdVsYs8jWw==",
+      "path": "microsoft.windows.sdk.buildtools/10.0.26100.7705",
+      "hashPath": "microsoft.windows.sdk.buildtools.10.0.26100.7705.nupkg.sha512"
+    },
+    "Microsoft.WindowsAppSDK/1.6.250602001": {
+      "type": "package",
+      "serviceable": true,
+      "sha512": "sha512-JglnV7XVYzgUcCYcIXRvU1aCM9VzCebq6kGr3CYjI6wR7mgAX5pp4EFvElc0j2i0pJgX5R5xtQs/t2t4m6rbWQ==",
+      "path": "microsoft.windowsappsdk/1.6.250602001",
+      "hashPath": "microsoft.windowsappsdk.1.6.250602001.nupkg.sha512"
+    },
+    "NAudio/2.3.0": {
+      "type": "package",
+      "serviceable": true,
+      "sha512": "sha512-xN+Lzlu9DmXqBiL6XkP0VZmgTxZPdSGjVSWtKG9HKuar3LhIYNOIYQETieigS+QDS+nrs1QmHbBWWOru0nWA5A==",
+      "path": "naudio/2.3.0",
+      "hashPath": "naudio.2.3.0.nupkg.sha512"
+    },
+    "NAudio.Asio/2.3.0": {
+      "type": "package",
+      "serviceable": true,
+      "sha512": "sha512-I+rAAPT8vmSEw4d4ie+AoSkrvNK6ylRrXznnjQKS+qZgTA9Jnt1Pxe0EaU8nXxOOq5h8ucBSWccBEw6I/J0nkQ==",
+      "path": "naudio.asio/2.3.0",
+      "hashPath": "naudio.asio.2.3.0.nupkg.sha512"
+    },
+    "NAudio.Core/2.3.0": {
+      "type": "package",
+      "serviceable": true,
+      "sha512": "sha512-jMd7r6dB6tAtXhOYL58ntPqwERNm1/Rhw5MKOIYvsnXzuX+PTGsa2VMam6n0npZYSwlSidKa4GAm4bFcXFUlcg==",
+      "path": "naudio.core/2.3.0",
+      "hashPath": "naudio.core.2.3.0.nupkg.sha512"
+    },
+    "NAudio.Midi/2.3.0": {
+      "type": "package",
+      "serviceable": true,
+      "sha512": "sha512-t8wvPFPHHQOHhoNMCaDE8OiYZoJuxmY4H6UPBtmnf+xx7oQuajFCqlG4Q00ID+tiEyj471WeVb4Nkylr4tDoow==",
+      "path": "naudio.midi/2.3.0",
+      "hashPath": "naudio.midi.2.3.0.nupkg.sha512"
+    },
+    "NAudio.Wasapi/2.3.0": {
+      "type": "package",
+      "serviceable": true,
+      "sha512": "sha512-y5K2BxrLnvohgu5znzg5wRsai3YcuNXfrpo68i7PmCQqpK5MC/R24e5aO3OyN/XhfRr12e0QYV0OnUWEHi5SzA==",
+      "path": "naudio.wasapi/2.3.0",
+      "hashPath": "naudio.wasapi.2.3.0.nupkg.sha512"
+    },
+    "NAudio.WinForms/2.3.0": {
+      "type": "package",
+      "serviceable": true,
+      "sha512": "sha512-vyKqFUlAZrZ0QPcCM1T+zimjYgC1cNDloHaiOdtV4S1eK4AGu3Dz1EE4yy/WgcneJwQNjGFaELY7b2TsL+g56w==",
+      "path": "naudio.winforms/2.3.0",
+      "hashPath": "naudio.winforms.2.3.0.nupkg.sha512"
+    },
+    "NAudio.WinMM/2.3.0": {
+      "type": "package",
+      "serviceable": true,
+      "sha512": "sha512-5G1dRjsZm50T3luyuqcmI2BSvj3K4ZJaD/x776/0Epj88qOsOryDZG40+MufwIk1UFJSFWhRobBqtJYFc8Ss4g==",
+      "path": "naudio.winmm/2.3.0",
+      "hashPath": "naudio.winmm.2.3.0.nupkg.sha512"
+    },
+    "Microsoft.Web.WebView2.Core.Projection/1.0.2651.64": {
+      "type": "reference",
+      "serviceable": false,
+      "sha512": ""
+    }
+  }
+}

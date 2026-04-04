@@ -1,21 +1,30 @@
-// TranslationViewModel.cs
-// 翻訳パネル用 ViewModel（macOS 版と同じ設計）
-
+#nullable enable
+using System;
+using System.Threading;
+using System.Threading.Tasks;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using AudioTranscriptionSummary.Models;
+using AudioTranscriptionSummary.Services;
 
 namespace AudioTranscriptionSummary.ViewModels;
 
 public partial class TranslationViewModel : ObservableObject
 {
+    private readonly TranslateService _translateService;
+
     [ObservableProperty] private string _translatedText = "";
     [ObservableProperty] private TranslationLanguage _selectedTargetLanguage = TranslationLanguage.Japanese;
     [ObservableProperty] private bool _isTranslating;
     [ObservableProperty] private string? _errorMessage;
 
+    public TranslationViewModel(TranslateService translateService)
+    {
+        _translateService = translateService;
+    }
+
     [RelayCommand]
-    private async Task TranslateAsync(string sourceText)
+    public async Task TranslateAsync(string? sourceText)
     {
         if (string.IsNullOrWhiteSpace(sourceText)) return;
         TranslatedText = "";
@@ -23,8 +32,9 @@ public partial class TranslationViewModel : ObservableObject
         ErrorMessage = null;
         try
         {
-            // TODO: AWS SDK for .NET の TranslateClient を使用
-            TranslatedText = $"[翻訳結果: {SelectedTargetLanguage.ToDisplayName()}]";
+            var targetCode = SelectedTargetLanguage.ToCode();
+            TranslatedText = await _translateService.TranslateTextAsync(
+                sourceText, targetCode, CancellationToken.None);
         }
         catch (Exception ex)
         {

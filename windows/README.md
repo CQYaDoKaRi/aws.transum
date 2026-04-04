@@ -1,74 +1,99 @@
-# AudioTranscriptionSummary - Windows 版
+# AudioTranscriptionSummary - Windows版
 
-Windows 向け音声文字起こし・要約アプリケーション（WinUI 3 / .NET 8 / C#）
+WinUI 3 / .NET 8 ネイティブアプリケーション
 
 ## 技術スタック
 
-- WinUI 3 (Windows App SDK)
-- .NET 8
-- C#
-- MVVM パターン（CommunityToolkit.Mvvm）
-- AWS SDK for .NET（Amazon Transcribe Streaming, Amazon Translate, Amazon S3）
-
-## 前提条件
-
-- Windows 10 version 1809 以降 / Windows 11
-- Visual Studio 2022 (17.8+) + Windows App SDK ワークロード
-- .NET 8 SDK
+| 技術 | 用途 |
+|------|------|
+| WinUI 3 (Windows App SDK 1.6) | UI フレームワーク |
+| .NET 8 | ランタイム |
+| CommunityToolkit.Mvvm | MVVM パターン |
+| NAudio | 音声キャプチャ・再生 |
+| AWSSDK.TranscribeService 4.* | Amazon Transcribe |
+| AWSSDK.TranscribeStreaming 4.* | Amazon Transcribe Streaming |
+| AWSSDK.Translate 4.* | Amazon Translate |
+| AWSSDK.S3 4.* | S3 アップロード |
 
 ## プロジェクト構成
 
 ```
-windows/
-├── AudioTranscriptionSummary.sln
-├── AudioTranscriptionSummary/
-│   ├── App.xaml / App.xaml.cs
-│   ├── MainWindow.xaml / MainWindow.xaml.cs
-│   ├── Models/
-│   │   ├── AudioFile.cs
-│   │   ├── Transcript.cs
-│   │   ├── Summary.cs
-│   │   ├── TranslationLanguage.cs
-│   │   └── AppSettings.cs
-│   ├── Services/
-│   │   ├── AudioCaptureService.cs        # WASAPI による音声キャプチャ
-│   │   ├── RealtimeTranscribeClient.cs   # Amazon Transcribe Streaming
-│   │   ├── TranslateService.cs           # Amazon Translate
-│   │   ├── TranscribeService.cs          # Amazon Transcribe (バッチ)
-│   │   ├── S3Service.cs                  # Amazon S3
-│   │   ├── AudioPlayerService.cs         # 音声再生
-│   │   └── SettingsStore.cs              # 設定永続化
-│   ├── ViewModels/
-│   │   ├── MainViewModel.cs
-│   │   ├── RealtimeTranscriptionViewModel.cs
-│   │   └── SettingsViewModel.cs
-│   └── Views/
-│       ├── MainPage.xaml                 # メインレイアウト（左右分割）
-│       ├── FileDropZone.xaml             # ファイル読み込みエリア
-│       ├── AudioCaptureControl.xaml      # 録音コントロール
-│       ├── TranscriptionPreviewPanel.xaml # リアルタイム文字起こし
-│       ├── TranslationPanel.xaml         # 翻訳結果
-│       ├── SummaryPanel.xaml             # 要約結果
-│       ├── AudioPlayerControl.xaml       # 音声プレーヤー
-│       └── SettingsDialog.xaml           # 設定画面
-└── AudioTranscriptionSummary.Tests/
-    └── ...
+windows/AudioTranscriptionSummary/
+├── Models/
+│   ├── AppError.cs          # エラー型
+│   ├── AppSettings.cs       # 設定モデル
+│   ├── AudioFile.cs         # 音声ファイルモデル
+│   ├── AudioSourceInfo.cs   # 音源情報モデル
+│   ├── Summary.cs           # 要約モデル
+│   ├── Transcript.cs        # 文字起こしモデル
+│   └── TranslationLanguage.cs # 翻訳言語列挙型
+├── Services/
+│   ├── AudioBufferConverter.cs    # 音声バッファ変換（PCM 16kHz）
+│   ├── AudioCaptureService.cs     # 音声キャプチャ（NAudio）
+│   ├── AudioPlayerService.cs      # 音声再生（NAudio）
+│   ├── ExportManager.cs           # エクスポート
+│   ├── FileImporter.cs            # ファイル読み込み
+│   ├── RealtimeTranscribeClient.cs # リアルタイム文字起こし（Transcribe Streaming）
+│   ├── S3Service.cs               # S3アップロード/削除
+│   ├── SettingsStore.cs           # 設定永続化（JSON）
+│   ├── StatusMonitor.cs           # CPU/メモリ監視
+│   ├── Summarizer.cs              # 抽出型要約
+│   ├── TranscribeClient.cs        # バッチ文字起こし（Transcribe）
+│   └── TranslateService.cs        # 翻訳（Translate）
+├── ViewModels/
+│   ├── MainViewModel.cs                  # メインViewModel
+│   ├── RealtimeTranscriptionViewModel.cs # リアルタイム文字起こしViewModel
+│   └── TranslationViewModel.cs           # 翻訳ViewModel
+├── Views/
+│   ├── MainPage.xaml(.cs)      # メイン画面
+│   └── AudioPlayerControl.xaml(.cs) # 音声プレーヤー
+├── App.xaml(.cs)               # アプリケーションエントリ
+├── MainWindow.xaml(.cs)        # メインウィンドウ
+└── AudioTranscriptionSummary.csproj
 ```
 
-## macOS 版との共通点
+## ビルド
 
-- 同じ UI レイアウト（左右分割、右パネル3セクション）
-- 同じ操作フロー（録音→文字起こし→翻訳→要約→エクスポート）
-- 同じ AWS サービス連携（Transcribe Streaming, Translate, S3）
-- 同じファイル命名規則（日付_時刻.拡張子）
-- 共通の仕様書（../specs/）
+```bash
+& "C:\Program Files\Microsoft Visual Studio\2022\Community\MSBuild\Current\Bin\MSBuild.exe" `
+  AudioTranscriptionSummary.csproj /p:Configuration=Release /p:Platform=x64 /restore
+```
 
-## macOS 版との相違点
+## 設定
 
-| 機能 | macOS | Windows |
-|------|-------|---------|
-| UI フレームワーク | SwiftUI | WinUI 3 (XAML) |
-| 音声キャプチャ | ScreenCaptureKit / AVCaptureSession | WASAPI / Windows.Media.Capture |
-| 音声再生 | AVAudioPlayer | MediaPlayer / NAudio |
-| 設定保存 | ~/Library/Application Support/ | %APPDATA%/ |
-| AWS SDK | AWS SDK for Swift | AWS SDK for .NET |
+アプリ内の設定ボタンから以下を構成:
+- AWS 認証情報（Access Key ID, Secret Access Key）
+- AWS リージョン、S3 バケット名
+- 録音保存先、エクスポート保存先
+- リアルタイム文字起こし有効/無効
+- 言語自動判別有効/無効
+
+設定は `%APPDATA%\AudioTranscriptionSummary\settings.json` に保存されます。
+
+## インストーラー
+
+Inno Setup 6 を使用してWindowsインストーラーを作成できます。
+
+### 前提条件
+
+- [Inno Setup 6](https://jrsoftware.org/isinfo.php) がインストール済みであること
+- Release ビルドが完了していること
+
+### ビルド手順
+
+```bash
+# ビルドスクリプトを実行
+powershell -File installer/build-installer.ps1
+```
+
+または Inno Setup Compiler で直接コンパイル:
+
+```bash
+& "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" installer/setup.iss
+```
+
+### 出力
+
+- `installer/output/AudioTranscriptionSummary_Setup_1.0.0.exe`
+- 日本語・英語対応
+- デスクトップアイコン作成オプション付き

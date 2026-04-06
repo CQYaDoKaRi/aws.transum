@@ -18,6 +18,7 @@ struct AudioTranscriptionSummaryApp: App {
     init() {
         // Dock にアプリアイコンを表示する
         NSApplication.shared.setActivationPolicy(.regular)
+        NSApplication.shared.applicationIconImage = Self.generateAppIcon()
 
         let settingsVM = AWSSettingsViewModel()
         _awsSettingsViewModel = StateObject(wrappedValue: settingsVM)
@@ -31,6 +32,100 @@ struct AudioTranscriptionSummaryApp: App {
         WindowGroup {
             MainView(viewModel: appViewModel, awsSettingsViewModel: awsSettingsViewModel)
         }
+    }
+
+    /// アプリアイコンを生成する（波形＋ドキュメント＋要約のデザイン）
+    private static func generateAppIcon() -> NSImage {
+        let size: CGFloat = 512
+        let image = NSImage(size: NSSize(width: size, height: size))
+        image.lockFocus()
+
+        guard let ctx = NSGraphicsContext.current?.cgContext else {
+            image.unlockFocus()
+            return image
+        }
+
+        // 角丸背景（macOS アイコンスタイル）
+        let rect = CGRect(x: 0, y: 0, width: size, height: size)
+        let cornerRadius: CGFloat = size * 0.22
+        let bgPath = CGPath(roundedRect: rect, cornerWidth: cornerRadius, cornerHeight: cornerRadius, transform: nil)
+
+        // グラデーション背景（深い青 → 明るい青）
+        ctx.saveGState()
+        ctx.addPath(bgPath)
+        ctx.clip()
+        let colorSpace = CGColorSpaceCreateDeviceRGB()
+        let colors = [
+            CGColor(red: 0.10, green: 0.30, blue: 0.75, alpha: 1.0),
+            CGColor(red: 0.20, green: 0.55, blue: 0.95, alpha: 1.0)
+        ] as CFArray
+        if let gradient = CGGradient(colorsSpace: colorSpace, colors: colors, locations: [0.0, 1.0]) {
+            ctx.drawLinearGradient(gradient, start: CGPoint(x: size / 2, y: 0), end: CGPoint(x: size / 2, y: size), options: [])
+        }
+        ctx.restoreGState()
+
+        // 波形（音声を表現）— 中央上部に白い波形バー
+        ctx.saveGState()
+        let waveColor = CGColor(red: 1, green: 1, blue: 1, alpha: 0.95)
+        ctx.setFillColor(waveColor)
+        let barWidth: CGFloat = 18
+        let barSpacing: CGFloat = 12
+        let barHeights: [CGFloat] = [60, 100, 140, 180, 160, 200, 150, 120, 170, 130, 90, 60]
+        let totalWidth = CGFloat(barHeights.count) * barWidth + CGFloat(barHeights.count - 1) * barSpacing
+        let startX = (size - totalWidth) / 2
+        let centerY: CGFloat = size * 0.58
+
+        for (i, h) in barHeights.enumerated() {
+            let x = startX + CGFloat(i) * (barWidth + barSpacing)
+            let barRect = CGRect(x: x, y: centerY - h / 2, width: barWidth, height: h)
+            let barPath = CGPath(roundedRect: barRect, cornerWidth: barWidth / 2, cornerHeight: barWidth / 2, transform: nil)
+            ctx.addPath(barPath)
+            ctx.fillPath()
+        }
+        ctx.restoreGState()
+
+        // ドキュメントアイコン（右下に小さく）— 文字起こし・要約を表現
+        ctx.saveGState()
+        let docX: CGFloat = size * 0.62
+        let docY: CGFloat = size * 0.06
+        let docW: CGFloat = size * 0.28
+        let docH: CGFloat = size * 0.32
+        let docRect = CGRect(x: docX, y: docY, width: docW, height: docH)
+        let docPath = CGPath(roundedRect: docRect, cornerWidth: 8, cornerHeight: 8, transform: nil)
+
+        // ドキュメント背景（半透明白）
+        ctx.setFillColor(CGColor(red: 1, green: 1, blue: 1, alpha: 0.9))
+        ctx.addPath(docPath)
+        ctx.fillPath()
+
+        // ドキュメント内のテキスト行（青い線）
+        let lineColor = CGColor(red: 0.15, green: 0.40, blue: 0.85, alpha: 0.7)
+        ctx.setFillColor(lineColor)
+        let lineH: CGFloat = 6
+        let lineMargin: CGFloat = 16
+        let lineWidths: [CGFloat] = [0.8, 0.65, 0.75, 0.5]
+        for (i, widthRatio) in lineWidths.enumerated() {
+            let ly = docY + docH - lineMargin - CGFloat(i) * (lineH + 10) - lineH
+            let lw = (docW - lineMargin * 2) * widthRatio
+            let lineRect = CGRect(x: docX + lineMargin, y: ly, width: lw, height: lineH)
+            ctx.fill(lineRect)
+        }
+        ctx.restoreGState()
+
+        // 「T」文字（左下に）— Transcription を表現
+        ctx.saveGState()
+        let tFont = NSFont.systemFont(ofSize: size * 0.18, weight: .bold)
+        let tStr = NSAttributedString(string: "T", attributes: [
+            .font: tFont,
+            .foregroundColor: NSColor(white: 1.0, alpha: 0.85)
+        ])
+        let tSize = tStr.size()
+        let tPoint = NSPoint(x: size * 0.10, y: size * 0.08)
+        tStr.draw(at: tPoint)
+        ctx.restoreGState()
+
+        image.unlockFocus()
+        return image
     }
 
     /// AWS 認証情報から AppViewModel を構築する

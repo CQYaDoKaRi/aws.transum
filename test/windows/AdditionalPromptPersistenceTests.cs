@@ -1,4 +1,4 @@
-// AdditionalPromptPersistenceTests.cs
+﻿// AdditionalPromptPersistenceTests.cs
 // 追加プロンプトの設定保存・復元テスト
 // - 要約実行時に追加プロンプトが設定 JSON に保存されること
 // - アプリ起動時に復元されること
@@ -16,7 +16,7 @@ namespace AudioTranscriptionSummary.Tests;
 public class AdditionalPromptPersistenceTests : IDisposable
 {
     private static readonly string TestDataDir = Path.GetFullPath(
-        Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "..", "test", "data"));
+        Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "..", "..", "..", "test", "data"));
 
     private readonly string _settingsDir;
     private readonly string _settingsFile;

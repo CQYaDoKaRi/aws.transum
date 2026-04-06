@@ -1,4 +1,4 @@
-// ErrorLoggerTests.cs
+﻿// ErrorLoggerTests.cs
 // ErrorLogger のテスト
 // - 元ファイル名ベースのエラーログ出力
 // - ファイル名なしの場合は app.error.log に出力
@@ -19,7 +19,7 @@ namespace AudioTranscriptionSummary.Tests;
 public class ErrorLoggerTests : IDisposable
 {
     private static readonly string TestDataDir = Path.GetFullPath(
-        Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "..", "test", "data"));
+        Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "..", "..", "..", "test", "data"));
 
     private readonly List<string> _generatedFiles = new();
 
@@ -139,8 +139,8 @@ public class ErrorLoggerTests : IDisposable
     [Fact]
     public void TestAudioFileExists()
     {
-        var audioFile = Path.Combine(TestDataDir, "test.wav");
+        var audioFile = Path.Combine(TestDataDir, "test.m4a");
         Assert.True(File.Exists(audioFile),
-            "test/data/test.wav が存在しません。テストデータを配置してください。");
+            "test/data/test.m4a が存在しません。テストデータを配置してください。");
     }
 }

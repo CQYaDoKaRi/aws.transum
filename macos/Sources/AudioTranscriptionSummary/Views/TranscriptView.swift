@@ -18,12 +18,12 @@ struct TranscriptView: View {
             // ツールバー
             HStack {
                 Picker("言語", selection: $selectedLanguage) {
-                    Text("自動").tag(TranscriptionLanguage.auto)
-                    Text("日本語").tag(TranscriptionLanguage.japanese)
-                    Text("英語").tag(TranscriptionLanguage.english)
+                    ForEach(TranscriptionLanguage.allCases) { lang in
+                        Text(lang.displayName).tag(lang)
+                    }
                 }
-                .pickerStyle(.segmented)
-                .frame(width: 220)
+                .pickerStyle(.menu)
+                .frame(width: 140)
 
                 Spacer()
 

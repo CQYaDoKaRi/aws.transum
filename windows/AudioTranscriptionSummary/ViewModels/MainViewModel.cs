@@ -227,6 +227,39 @@ public partial class MainViewModel : ObservableObject
     }
 
     [RelayCommand]
+    private async Task SummarizeFromFileAsync(string filePath)
+    {
+        ErrorMessage = null;
+        try
+        {
+            var text = await System.IO.File.ReadAllTextAsync(filePath);
+            if (string.IsNullOrWhiteSpace(text))
+            {
+                ErrorMessage = "ファイルが空です";
+                return;
+            }
+            var tempTranscript = new Transcript(
+                Guid.NewGuid(),
+                AudioFile?.Id ?? Guid.NewGuid(),
+                text,
+                "auto",
+                DateTime.Now
+            );
+            Transcript = tempTranscript;
+            IsSummarizing = true;
+            Summary = await _summarizer.SummarizeAsync(tempTranscript, SummaryAdditionalPrompt);
+        }
+        catch (Exception ex)
+        {
+            ErrorMessage = $"ファイルからの要約に失敗しました: {ex.Message}";
+        }
+        finally
+        {
+            IsSummarizing = false;
+        }
+    }
+
+    [RelayCommand]
     private async Task ExportAsync()
     {
         if (Transcript == null) return;

@@ -201,6 +201,21 @@ public sealed partial class MainPage : Page
         RecordButton.Visibility = _vm.IsCapturing ? Visibility.Collapsed : Visibility.Visible;
         StopRecordButton.Visibility = _vm.IsCapturing ? Visibility.Visible : Visibility.Collapsed;
         CancelButton.Visibility = _vm.IsCapturing ? Visibility.Visible : Visibility.Collapsed;
+
+        if (_vm.IsCapturing)
+        {
+            // 録音開始: 入力とリアルタイムを展開、音声文字起こしと要約を閉じる
+            InputSection.IsExpanded = true;
+            RealtimeSection.IsExpanded = true;
+            TranscriptSection.IsExpanded = false;
+            SummarySection.IsExpanded = false;
+        }
+        else
+        {
+            // 録音終了: 音声文字起こしと要約を展開
+            TranscriptSection.IsExpanded = true;
+            SummarySection.IsExpanded = true;
+        }
     }
 
     private void UpdateFileInfo()
@@ -484,6 +499,7 @@ public sealed partial class MainPage : Page
             var file = items.OfType<StorageFile>().FirstOrDefault();
             if (file != null)
             {
+                CollapseInputAndRealtime();
                 _vm.ImportFileCommand.Execute(file.Path);
             }
         }
@@ -504,6 +520,7 @@ public sealed partial class MainPage : Page
         var file = await picker.PickSingleFileAsync();
         if (file != null)
         {
+            CollapseInputAndRealtime();
             _vm.ImportFileCommand.Execute(file.Path);
         }
     }
@@ -565,6 +582,39 @@ public sealed partial class MainPage : Page
     {
         if (_vm.Summary != null)
             await _vm.SummaryTranslationVM.TranslateAsync(_vm.Summary.Text);
+    }
+
+    // 折りたたみ連動: 入力とリアルタイムを閉じる
+    private void CollapseInputAndRealtime()
+    {
+        InputSection.IsExpanded = false;
+        RealtimeSection.IsExpanded = false;
+    }
+
+    // 「ファイルから要約」ボタン
+    private async void OnSummaryFileClick(object sender, RoutedEventArgs e)
+    {
+        var picker = new FileOpenPicker();
+        picker.SuggestedStartLocation = PickerLocationId.DocumentsLibrary;
+        picker.FileTypeFilter.Add(".txt");
+
+        var hwnd = GetWindowHandle();
+        if (hwnd != IntPtr.Zero)
+            WinRT.Interop.InitializeWithWindow.Initialize(picker, hwnd);
+
+        var file = await picker.PickSingleFileAsync();
+        if (file != null)
+        {
+            CollapseInputAndRealtime();
+            _vm.SummarizeFromFileCommand.Execute(file.Path);
+        }
+    }
+
+    // 「要約」ボタン
+    private async void OnResummarizeClick(object sender, RoutedEventArgs e)
+    {
+        _vm.SummaryAdditionalPrompt = SummaryPromptBox.Text;
+        await _vm.ResummarizeCommand.ExecuteAsync(null);
     }
 
     // Error dialog

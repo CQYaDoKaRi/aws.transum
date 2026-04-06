@@ -21,7 +21,7 @@
             <StackPanel Spacing="4" Padding="8">
 
                 <!-- ===== 入力 ===== -->
-                <Expander IsExpanded="True" HorizontalAlignment="Stretch" HorizontalContentAlignment="Stretch">
+                <Expander x:Name="InputSection" IsExpanded="True" HorizontalAlignment="Stretch" HorizontalContentAlignment="Stretch">
                     <Expander.Header>
                         <Border Background="#200078D4" CornerRadius="4" Padding="10,6" Margin="-12,-6,-12,-6">
                             <StackPanel Orientation="Horizontal" Spacing="8">
@@ -83,7 +83,7 @@
                 </Expander>
 
                 <!-- ===== 音声文字起こし ===== -->
-                <Expander IsExpanded="True" HorizontalAlignment="Stretch" HorizontalContentAlignment="Stretch">
+                <Expander x:Name="TranscriptSection" IsExpanded="True" HorizontalAlignment="Stretch" HorizontalContentAlignment="Stretch">
                     <Expander.Header>
                         <Border Background="#2016C60C" CornerRadius="4" Padding="10,6" Margin="-12,-6,-12,-6">
                             <StackPanel Orientation="Horizontal" Spacing="8">
@@ -139,7 +139,7 @@
                 </Expander>
 
                 <!-- ===== 要約 ===== -->
-                <Expander IsExpanded="True" HorizontalAlignment="Stretch" HorizontalContentAlignment="Stretch">
+                <Expander x:Name="SummarySection" IsExpanded="True" HorizontalAlignment="Stretch" HorizontalContentAlignment="Stretch">
                     <Expander.Header>
                         <Border Background="#20F7630C" CornerRadius="4" Padding="10,6" Margin="-12,-6,-12,-6">
                             <StackPanel Orientation="Horizontal" Spacing="8">

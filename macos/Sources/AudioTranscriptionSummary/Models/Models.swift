@@ -6,14 +6,57 @@ import Foundation
 
 // MARK: - TranscriptionLanguage（文字起こし言語）
 
-/// 文字起こしに使用する言語を表す列挙型
-enum TranscriptionLanguage: String {
-    /// 自動判定
+/// 文字起こしに使用する言語を表す列挙型（Amazon Transcribe 対応言語）
+enum TranscriptionLanguage: String, CaseIterable, Identifiable {
     case auto = "auto"
-    /// 日本語
     case japanese = "ja-JP"
-    /// 英語
     case english = "en-US"
+    case chinese = "zh-CN"
+    case korean = "ko-KR"
+    case french = "fr-FR"
+    case german = "de-DE"
+    case spanish = "es-ES"
+    case portuguese = "pt-BR"
+    case italian = "it-IT"
+    case hindi = "hi-IN"
+    case arabic = "ar-SA"
+    case russian = "ru-RU"
+    case turkish = "tr-TR"
+    case dutch = "nl-NL"
+    case swedish = "sv-SE"
+    case polish = "pl-PL"
+    case thai = "th-TH"
+    case indonesian = "id-ID"
+    case vietnamese = "vi-VN"
+    case malay = "ms-MY"
+
+    var id: String { rawValue }
+
+    var displayName: String {
+        switch self {
+        case .auto: return "自動"
+        case .japanese: return "日本語"
+        case .english: return "英語"
+        case .chinese: return "中国語"
+        case .korean: return "韓国語"
+        case .french: return "フランス語"
+        case .german: return "ドイツ語"
+        case .spanish: return "スペイン語"
+        case .portuguese: return "ポルトガル語"
+        case .italian: return "イタリア語"
+        case .hindi: return "ヒンディー語"
+        case .arabic: return "アラビア語"
+        case .russian: return "ロシア語"
+        case .turkish: return "トルコ語"
+        case .dutch: return "オランダ語"
+        case .swedish: return "スウェーデン語"
+        case .polish: return "ポーランド語"
+        case .thai: return "タイ語"
+        case .indonesian: return "インドネシア語"
+        case .vietnamese: return "ベトナム語"
+        case .malay: return "マレー語"
+        }
+    }
 }
 
 // MARK: - AudioFile（音声ファイル）

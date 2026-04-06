@@ -7,6 +7,8 @@ import UniformTypeIdentifiers
 
 struct FileDropZone: View {
     @ObservedObject var viewModel: AppViewModel
+    /// ファイル選択時に呼ばれるコールバック（折りたたみ連動用）
+    var onFileSelected: (() -> Void)?
     @State private var isFileImporterPresented = false
     @State private var isDragOver = false
 
@@ -111,7 +113,10 @@ struct FileDropZone: View {
         guard let provider = providers.first else { return false }
         provider.loadItem(forTypeIdentifier: "public.file-url", options: nil) { data, _ in
             guard let urlData = data as? Data, let url = URL(dataRepresentation: urlData, relativeTo: nil) else { return }
-            Task { @MainActor in await viewModel.importFile(from: url) }
+            Task { @MainActor in
+                onFileSelected?()
+                await viewModel.importFile(from: url)
+            }
         }
         return true
     }
@@ -120,6 +125,7 @@ struct FileDropZone: View {
         guard case .success(let urls) = result, let url = urls.first else { return }
         let accessed = url.startAccessingSecurityScopedResource()
         Task { @MainActor in
+            onFileSelected?()
             await viewModel.importFile(from: url)
             if accessed { url.stopAccessingSecurityScopedResource() }
         }

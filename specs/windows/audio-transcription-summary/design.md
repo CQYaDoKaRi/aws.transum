@@ -310,6 +310,19 @@ public class AppError : Exception
 
 ## 状態遷移図
 
+### 折りたたみセクション自動開閉連動
+
+各操作に応じて、Expanderセクション（入力、リアルタイム文字起こし、音声文字起こし、要約）のIsExpandedプロパティを自動制御する。
+
+| 操作 | 入力 | リアルタイム | 音声文字起こし | 要約 |
+|------|------|------------|--------------|------|
+| 録音開始 | 展開 | 展開 | 折りたたみ | 折りたたみ |
+| 録音停止 | - | - | 展開 | 展開 |
+| ファイルD&D/選択 | 折りたたみ | 折りたたみ | - | - |
+| ファイルから要約 | 折りたたみ | 折りたたみ | - | - |
+
+**実装方式**: MainPage.xamlの各Expanderに`x:Name`を付与（InputSection, RealtimeSection, TranscriptSection, SummarySection）し、コードビハインドで`IsExpanded`プロパティを直接制御する。`CollapseInputAndRealtime()`ヘルパーメソッドで入力+リアルタイムの折りたたみを共通化する。
+
 ```mermaid
 stateDiagram-v2
     [*] --> Idle: アプリ起動

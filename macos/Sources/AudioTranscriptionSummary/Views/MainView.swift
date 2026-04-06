@@ -130,8 +130,7 @@ struct MainView: View {
     // MARK: - 下部: 出力
 
     private var outputArea: some View {
-        ScrollView(.vertical, showsIndicators: true) {
-            VStack(spacing: 0) {
+        VStack(spacing: 0) {
                 // リアルタイム文字起こし（設定で無効の場合は非表示）
                 if awsSettingsViewModel.isRealtimeEnabled {
                     collapsibleSection(title: "リアルタイム文字起こし", icon: "waveform.badge.mic", isExpanded: $isRealtimeExpanded) {
@@ -155,7 +154,13 @@ struct MainView: View {
 
                 collapsibleSection(title: "音声文字起こし", icon: "waveform", isExpanded: $isTranscriptExpanded) {
                     VStack(spacing: 0) {
-                        FileDropZone(viewModel: viewModel).padding(.horizontal, 8).padding(.top, 4).padding(.bottom, 2)
+                        FileDropZone(viewModel: viewModel) {
+                            // ファイル選択時: 入力とリアルタイムを閉じる
+                            withAnimation(.easeInOut(duration: 0.2)) {
+                                isInputExpanded = false
+                                isRealtimeExpanded = false
+                            }
+                        }.padding(.horizontal, 8).padding(.top, 4).padding(.bottom, 2)
                         AudioPlayerView(viewModel: viewModel).padding(.horizontal, 8).padding(.vertical, 2)
                         Divider()
                         HStack(spacing: 0) {
@@ -199,7 +204,7 @@ struct MainView: View {
                                     Button {
                                         showSummaryFileImporter = true
                                     } label: {
-                                        Label("ファイルから", systemImage: "doc.text")
+                                        Label("ファイルから要約", systemImage: "doc.text")
                                             .font(.caption).frame(maxWidth: .infinity)
                                     }
                                     .controlSize(.small)
@@ -218,6 +223,11 @@ struct MainView: View {
                         }
                         .fileImporter(isPresented: $showSummaryFileImporter, allowedContentTypes: [.plainText, .text], allowsMultipleSelection: false) { result in
                             if case .success(let urls) = result, let url = urls.first {
+                                // ファイル選択時: 入力とリアルタイムを閉じる
+                                withAnimation(.easeInOut(duration: 0.2)) {
+                                    isInputExpanded = false
+                                    isRealtimeExpanded = false
+                                }
                                 let accessed = url.startAccessingSecurityScopedResource()
                                 Task {
                                     await viewModel.summarizeFromFile(url: url)
@@ -235,7 +245,6 @@ struct MainView: View {
                     }
                 }
             }
-        }
         .background(Color(.windowBackgroundColor))
     }
 
@@ -270,6 +279,14 @@ struct MainView: View {
 
     private func handleCaptureChange(_ capturing: Bool) {
         if capturing {
+            // 録音開始: 入力とリアルタイムを展開、音声文字起こしと要約を閉じる
+            withAnimation(.easeInOut(duration: 0.2)) {
+                isInputExpanded = true
+                isRealtimeExpanded = true
+                isTranscriptExpanded = false
+                isSummaryExpanded = false
+            }
+
             realtimeVM.finalText = ""; realtimeVM.partialText = ""
             realtimeVM.detectedLanguage = nil; realtimeVM.errorMessage = nil
             realtimeTranslationVM.reset(); transcriptTranslationVM.reset(); summaryTranslationVM.reset()
@@ -279,6 +296,12 @@ struct MainView: View {
                 viewModel.setRealtimeAudioCallback { [weak realtimeVM] buffer in realtimeVM?.sendAudioBuffer(buffer) }
             }
         } else if !isAnyCapturing {
+            // 録音終了: 音声文字起こしと要約を展開
+            withAnimation(.easeInOut(duration: 0.2)) {
+                isTranscriptExpanded = true
+                isSummaryExpanded = true
+            }
+
             realtimeVM.stopStreaming()
             if let af = viewModel.audioFile, let t = realtimeVM.toTranscript(audioFileId: af.id) { viewModel.transcript = t }
             viewModel.setRealtimeAudioCallback(nil)

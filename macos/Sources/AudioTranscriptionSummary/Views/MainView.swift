@@ -166,12 +166,42 @@ struct MainView: View {
                 }
                 Divider()
                 collapsibleSection(title: "要約", icon: "doc.text", isExpanded: $isSummaryExpanded) {
-                    HStack(spacing: 0) {
-                        SummaryView(viewModel: viewModel).frame(maxWidth: .infinity, maxHeight: .infinity)
+                    VStack(spacing: 0) {
+                        // 追加プロンプト入力 + 要約し直すボタン
+                        HStack(spacing: 6) {
+                            TextEditor(text: $viewModel.summaryAdditionalPrompt)
+                                .font(.caption)
+                                .frame(height: 50)
+                                .overlay(
+                                    RoundedRectangle(cornerRadius: 4)
+                                        .stroke(Color(.separatorColor), lineWidth: 1)
+                                )
+                                .overlay(alignment: .topLeading) {
+                                    if viewModel.summaryAdditionalPrompt.isEmpty {
+                                        Text("追加プロンプト（例: 箇条書きで要約して）")
+                                            .font(.caption).foregroundStyle(.tertiary)
+                                            .padding(.horizontal, 4).padding(.top, 6)
+                                            .allowsHitTesting(false)
+                                    }
+                                }
+                            Button {
+                                Task { await viewModel.resummarize() }
+                            } label: {
+                                Label("要約し直す", systemImage: "arrow.clockwise")
+                                    .font(.caption)
+                            }
+                            .disabled(viewModel.transcript == nil || viewModel.isSummarizing)
+                            .controlSize(.small)
+                        }
+                        .padding(.horizontal, 8).padding(.vertical, 4)
                         Divider()
-                        TranslationPanel(sourceText: viewModel.summary?.text ?? "", translationVM: summaryTranslationVM).frame(maxWidth: .infinity, maxHeight: .infinity)
+                        HStack(spacing: 0) {
+                            SummaryView(viewModel: viewModel).frame(maxWidth: .infinity, maxHeight: .infinity)
+                            Divider()
+                            TranslationPanel(sourceText: viewModel.summary?.text ?? "", translationVM: summaryTranslationVM).frame(maxWidth: .infinity, maxHeight: .infinity)
+                        }
+                        .frame(minHeight: 80)
                     }
-                    .frame(minHeight: 80)
                 }
             }
         }

@@ -248,27 +248,32 @@ class AppViewModel: ObservableObject {
 
     // MARK: - 要約
 
+    /// 追加プロンプト（要約時に使用）
+    @Published var summaryAdditionalPrompt: String = ""
+
     /// 要約を開始する
-    /// Summarizer を呼び出し、Transcript の要約を生成する
     func startSummarization() async {
         guard let transcript = transcript else { return }
-
-        // 状態をリセット
         errorMessage = nil
         isSummarizing = true
         summary = nil
         lastOperation = .summarization
 
         do {
-            let result = try await summarizer.summarize(transcript: transcript)
+            let result = try await summarizer.summarize(transcript: transcript, additionalPrompt: summaryAdditionalPrompt)
             summary = result
         } catch let error as AppError {
             errorMessage = error.errorDescription
         } catch {
             errorMessage = error.localizedDescription
         }
-
         isSummarizing = false
+    }
+
+    /// 要約のみ再実行する（文字起こし結果が既にある場合）
+    func resummarize() async {
+        guard transcript != nil else { return }
+        await startSummarization()
     }
 
     // MARK: - 文字起こし + 要約 + 自動エクスポート（一括実行）

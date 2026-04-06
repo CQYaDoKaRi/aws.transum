@@ -1,7 +1,10 @@
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text.RegularExpressions;
+// Summarizer.cs
+// Amazon Bedrock（Claude）を使用した生成型要約サービス
+// AWS 認証情報未設定時はローカル抽出型要約にフォールバック
+
+using System.Text.Json;
+using Amazon.BedrockRuntime;
+using Amazon.BedrockRuntime.Model;
 using AudioTranscriptionSummary.Models;
 
 namespace AudioTranscriptionSummary.Services;
@@ -10,124 +13,101 @@ public class Summarizer
 {
     public const int MinimumCharacterCount = 50;
 
-    private static readonly char[] SentenceDelimiters = { '。', '！', '？', '.', '!', '?' };
+    private readonly SettingsStore _settingsStore;
 
-    public Summary Summarize(Transcript transcript)
+    public Summarizer(SettingsStore settingsStore)
+    {
+        _settingsStore = settingsStore;
+    }
+
+    public async Task<Summary> SummarizeAsync(Transcript transcript, string additionalPrompt = "")
     {
         if (transcript.Text.Length < MinimumCharacterCount)
+            throw new InvalidOperationException($"要約するには内容が不十分です（最低{MinimumCharacterCount}文字必要）");
+
+        var settings = _settingsStore.Load();
+
+        // Bedrock で要約を試みる
+        if (!string.IsNullOrEmpty(settings.AccessKeyId) && !string.IsNullOrEmpty(settings.SecretAccessKey))
         {
-            throw new AppError(
-                AppErrorType.InsufficientContent,
-                "要約するには内容が不十分です");
-        }
-
-        var sentences = SplitSentences(transcript.Text);
-        if (sentences.Count == 0)
-        {
-            throw new AppError(
-                AppErrorType.InsufficientContent,
-                "要約するには内容が不十分です");
-        }
-
-        var wordFrequencies = CalculateWordFrequencies(sentences);
-        var scores = new List<(int Index, double Score)>();
-
-        for (int i = 0; i < sentences.Count; i++)
-        {
-            double freqScore = CalculateFrequencyScore(sentences[i], wordFrequencies);
-            double posScore = CalculatePositionScore(i, sentences.Count);
-            double lenScore = CalculateLengthScore(sentences[i], sentences);
-            double totalScore = freqScore + posScore + lenScore;
-            scores.Add((i, totalScore));
-        }
-
-        int selectCount = Math.Max(1, (int)Math.Round(sentences.Count * 0.3));
-        var topIndices = scores
-            .OrderByDescending(s => s.Score)
-            .Take(selectCount)
-            .Select(s => s.Index)
-            .OrderBy(i => i) // preserve original order
-            .ToList();
-
-        var summaryText = string.Join("", topIndices.Select(i => sentences[i]));
-
-        return new Summary(
-            Id: Guid.NewGuid(),
-            TranscriptId: transcript.Id,
-            Text: summaryText,
-            CreatedAt: DateTime.Now);
-    }
-
-    private static List<string> SplitSentences(string text)
-    {
-        var sentences = new List<string>();
-        var pattern = @"[^。！？.!?]*[。！？.!?]";
-        var matches = Regex.Matches(text, pattern);
-
-        foreach (Match match in matches)
-        {
-            var sentence = match.Value.Trim();
-            if (!string.IsNullOrWhiteSpace(sentence))
-                sentences.Add(sentence);
-        }
-
-        // If no delimiters found, treat entire text as one sentence
-        if (sentences.Count == 0 && !string.IsNullOrWhiteSpace(text))
-            sentences.Add(text.Trim());
-
-        return sentences;
-    }
-
-    private static Dictionary<string, int> CalculateWordFrequencies(List<string> sentences)
-    {
-        var freq = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
-        foreach (var sentence in sentences)
-        {
-            var words = Regex.Split(sentence, @"[\s\p{P}]+")
-                .Where(w => !string.IsNullOrWhiteSpace(w));
-            foreach (var word in words)
+            try
             {
-                freq.TryGetValue(word, out int count);
-                freq[word] = count + 1;
+                var summaryText = await SummarizeWithBedrockAsync(transcript.Text, additionalPrompt, settings);
+                return new Summary
+                {
+                    Id = Guid.NewGuid().ToString(),
+                    TranscriptId = transcript.Id,
+                    Text = summaryText,
+                    CreatedAt = DateTime.UtcNow
+                };
+            }
+            catch
+            {
+                // フォールバック
             }
         }
-        return freq;
+
+        // ローカル抽出型要約
+        var localSummary = LocalExtractSummary(transcript.Text);
+        return new Summary
+        {
+            Id = Guid.NewGuid().ToString(),
+            TranscriptId = transcript.Id,
+            Text = localSummary,
+            CreatedAt = DateTime.UtcNow
+        };
     }
 
-    private static double CalculateFrequencyScore(string sentence, Dictionary<string, int> frequencies)
+    private async Task<string> SummarizeWithBedrockAsync(string text, string additionalPrompt, AppSettings settings)
     {
-        var words = Regex.Split(sentence, @"[\s\p{P}]+")
-            .Where(w => !string.IsNullOrWhiteSpace(w))
+        var client = new AmazonBedrockRuntimeClient(
+            settings.AccessKeyId,
+            settings.SecretAccessKey,
+            Amazon.RegionEndpoint.GetBySystemName(settings.Region)
+        );
+
+        var modelId = string.IsNullOrEmpty(settings.BedrockModelId)
+            ? BedrockModel.DefaultModelId
+            : settings.BedrockModelId;
+
+        var prompt = "以下のテキストを簡潔に要約してください。要約は元のテキストの言語で出力してください。箇条書きではなく、自然な文章で要約してください。";
+        if (!string.IsNullOrWhiteSpace(additionalPrompt))
+            prompt += $"\n\n追加の指示:\n{additionalPrompt}";
+        prompt += $"\n\nテキスト:\n{text}";
+
+        var request = new ConverseRequest
+        {
+            ModelId = modelId,
+            Messages =
+            [
+                new Message
+                {
+                    Role = ConversationRole.User,
+                    Content = [new ContentBlock { Text = prompt }]
+                }
+            ],
+            InferenceConfig = new InferenceConfiguration
+            {
+                MaxTokens = 1024,
+                Temperature = 0.3f
+            }
+        };
+
+        var response = await client.ConverseAsync(request);
+        var responseText = response.Output?.Message?.Content?.FirstOrDefault()?.Text;
+        return responseText?.Trim() ?? "";
+    }
+
+    private static string LocalExtractSummary(string text)
+    {
+        var sentences = text.Split(['.', '。', '!', '?', '！', '？', '\n'], StringSplitOptions.RemoveEmptyEntries)
+            .Select(s => s.Trim())
+            .Where(s => s.Length > 0)
             .ToList();
 
-        if (words.Count == 0) return 0;
+        if (sentences.Count <= 1) return text.Trim();
 
-        int maxFreq = frequencies.Values.Max();
-        if (maxFreq == 0) return 0;
-
-        double sum = words.Sum(w => frequencies.TryGetValue(w, out int f) ? (double)f / maxFreq : 0);
-        return sum / words.Count;
-    }
-
-    private static double CalculatePositionScore(int index, int total)
-    {
-        if (total <= 1) return 1.0;
-        if (index == 0) return 1.0;
-        if (index == total - 1) return 0.5;
-
-        // Linear decrease from 1.0 to 0.5 for middle sentences
-        return 1.0 - (0.5 * index / (total - 1));
-    }
-
-    private static double CalculateLengthScore(string sentence, List<string> allSentences)
-    {
-        if (allSentences.Count == 0) return 0;
-
-        double avgLength = allSentences.Average(s => s.Length);
-        if (avgLength == 0) return 0;
-
-        // Sentences closer to average length score higher
-        double ratio = sentence.Length / avgLength;
-        return ratio > 1.0 ? 1.0 / ratio : ratio;
+        var count = Math.Max(1, (int)Math.Ceiling(sentences.Count * 0.3));
+        return string.Join(" ", sentences.Take(count));
     }
 }

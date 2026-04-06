@@ -40,6 +40,7 @@ public partial class MainViewModel : ObservableObject
     [ObservableProperty] private bool _isSummarizing;
     [ObservableProperty] private float _audioLevel;
     [ObservableProperty] private string? _errorMessage;
+    [ObservableProperty] private string _summaryAdditionalPrompt = "";
     [ObservableProperty] private bool _isPlaying;
     [ObservableProperty] private TimeSpan _playbackPosition;
     [ObservableProperty] private List<AudioSourceInfo> _audioSources = new();
@@ -64,7 +65,7 @@ public partial class MainViewModel : ObservableObject
         _fileImporter = new FileImporter();
         _audioCaptureService = new AudioCaptureService();
         _audioPlayerService = new AudioPlayerService();
-        _summarizer = new Summarizer();
+        _summarizer = new Summarizer(_settingsStore);
         _exportManager = new ExportManager();
         _statusMonitor = new StatusMonitor();
         _transcribeClient = new TranscribeClient(_settingsStore);
@@ -170,7 +171,7 @@ public partial class MainViewModel : ObservableObject
             IsSummarizing = true;
             try
             {
-                Summary = _summarizer.Summarize(transcript);
+                Summary = await _summarizer.SummarizeAsync(transcript, SummaryAdditionalPrompt);
             }
             catch (AppError ex) when (ex.ErrorType == AppErrorType.InsufficientContent)
             {
@@ -198,6 +199,26 @@ public partial class MainViewModel : ObservableObject
         catch (Exception ex)
         {
             ErrorMessage = $"処理エラー: {ex.Message}";
+        }
+        finally
+        {
+            IsSummarizing = false;
+        }
+    }
+
+    [RelayCommand]
+    private async Task ResummarizeAsync()
+    {
+        if (Transcript == null) return;
+        ErrorMessage = null;
+        IsSummarizing = true;
+        try
+        {
+            Summary = await _summarizer.SummarizeAsync(Transcript, SummaryAdditionalPrompt);
+        }
+        catch (Exception ex)
+        {
+            ErrorMessage = $"要約に失敗しました: {ex.Message}";
         }
         finally
         {

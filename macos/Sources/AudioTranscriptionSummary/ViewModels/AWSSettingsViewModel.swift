@@ -35,6 +35,7 @@ class AWSSettingsViewModel: ObservableObject {
     @Published var isRealtimeEnabled: Bool = true
     @Published var isAutoDetectEnabled: Bool = true
     @Published var defaultTargetLanguage: TranslationLanguage = .japanese
+    @Published var bedrockModelId: String = "anthropic.claude-3-haiku-20240307-v1:0"
 
     // MARK: - 設定ファイルストア
 
@@ -101,6 +102,11 @@ class AWSSettingsViewModel: ObservableObject {
         AppSettingsStore().load().region
     }
 
+    /// 要約に使用する Bedrock 基盤モデル ID
+    nonisolated static var currentBedrockModelId: String {
+        AppSettingsStore().load().bedrockModelId
+    }
+
     // MARK: - イニシャライザ
 
     init() {
@@ -125,6 +131,7 @@ class AWSSettingsViewModel: ObservableObject {
         isRealtimeEnabled = settings.isRealtimeEnabled
         isAutoDetectEnabled = settings.isAutoDetectEnabled
         defaultTargetLanguage = TranslationLanguage(rawValue: settings.defaultTargetLanguage) ?? .japanese
+        bedrockModelId = settings.bedrockModelId
         isSaved = !settings.accessKeyId.isEmpty && !settings.secretAccessKey.isEmpty
     }
 
@@ -140,7 +147,8 @@ class AWSSettingsViewModel: ObservableObject {
             exportDirectoryPath: exportDirectoryPath,
             isRealtimeEnabled: isRealtimeEnabled,
             isAutoDetectEnabled: isAutoDetectEnabled,
-            defaultTargetLanguage: defaultTargetLanguage.rawValue
+            defaultTargetLanguage: defaultTargetLanguage.rawValue,
+            bedrockModelId: bedrockModelId
         )
         do {
             try Self.settingsStore.save(settings)

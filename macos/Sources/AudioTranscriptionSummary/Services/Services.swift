@@ -45,13 +45,8 @@ protocol Transcribing {
 
 /// 文字起こしテキストの要約を担当するプロトコル
 protocol Summarizing {
-    /// Transcript の要約を生成する
-    /// - Parameter transcript: 要約対象の Transcript
-    /// - Returns: 生成された Summary
-    /// - Throws: `AppError.summarizationFailed` または `AppError.insufficientContent`
     func summarize(transcript: Transcript) async throws -> Summary
-
-    /// 要約可能な最小文字数
+    func summarize(transcript: Transcript, additionalPrompt: String) async throws -> Summary
     static var minimumCharacterCount: Int { get }
 }
 

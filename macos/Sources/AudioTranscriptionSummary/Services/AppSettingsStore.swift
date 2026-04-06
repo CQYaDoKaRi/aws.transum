@@ -26,6 +26,8 @@ struct AppSettings: Codable, Equatable {
     var isAutoDetectEnabled: Bool = true
     /// デフォルト翻訳先言語コード
     var defaultTargetLanguage: String = "ja"
+    /// 要約に使用する Bedrock 基盤モデル ID
+    var bedrockModelId: String = "anthropic.claude-sonnet-4-6-20260617-v1:0"
 }
 
 // MARK: - AppSettingsStore（設定ファイル管理）

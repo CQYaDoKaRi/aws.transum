@@ -142,6 +142,17 @@ struct AWSSettingsView: View {
                         }
                         .disabled(!viewModel.isRealtimeEnabled)
                     }
+
+                    // 要約設定（Bedrock 基盤モデル選択）
+                    settingsGroup(title: "要約（Bedrock）", icon: "doc.text.magnifyingglass") {
+                        settingsRow("基盤モデル") {
+                            Picker("", selection: $viewModel.bedrockModelId) {
+                                ForEach(BedrockModel.available) { model in
+                                    Text("\(model.name) (\(model.provider))").tag(model.id)
+                                }
+                            }
+                        }
+                    }
                 }
                 .padding()
             }

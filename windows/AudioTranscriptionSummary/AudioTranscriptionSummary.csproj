@@ -19,6 +19,7 @@
     <PackageReference Include="AWSSDK.TranscribeStreaming" Version="4.*" />
     <PackageReference Include="AWSSDK.Translate" Version="4.*" />
     <PackageReference Include="AWSSDK.S3" Version="4.*" />
+    <PackageReference Include="AWSSDK.BedrockRuntime" Version="4.*" />
     <PackageReference Include="NAudio" Version="2.*" />
   </ItemGroup>
 </Project>

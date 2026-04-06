@@ -13,3 +13,6 @@ macos/installer/output/
 windows/AudioTranscriptionSummary/bin/
 windows/AudioTranscriptionSummary/obj/
 windows/installer/output/
+
+# テストデータ（音声ファイル・文字起こしテキスト等）
+test/data/

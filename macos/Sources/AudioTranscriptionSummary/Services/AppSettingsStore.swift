@@ -28,6 +28,8 @@ struct AppSettings: Codable, Equatable {
     var defaultTargetLanguage: String = "ja"
     /// 要約に使用する Bedrock 基盤モデル ID
     var bedrockModelId: String = "anthropic.claude-sonnet-4-6"
+    /// 要約時の追加プロンプト
+    var summaryAdditionalPrompt: String = ""
 }
 
 // MARK: - AppSettingsStore（設定ファイル管理）

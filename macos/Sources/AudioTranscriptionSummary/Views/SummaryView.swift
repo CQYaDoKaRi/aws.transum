@@ -36,16 +36,13 @@ struct SummaryView: View {
             } else if viewModel.transcript == nil {
                 ContentUnavailableView {
                     Label("要約結果", systemImage: "doc.text")
-                } description: {
-                    Text("文字起こし＋要約を実行してください")
-                }
+                } description: { EmptyView() }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else if viewModel.isSummarizing {
-                VStack {
-                    ProgressView()
+                ContentUnavailableView {
+                    Label("要約結果", systemImage: "doc.text")
+                } description: {
                     Text("要約を生成中...")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else {

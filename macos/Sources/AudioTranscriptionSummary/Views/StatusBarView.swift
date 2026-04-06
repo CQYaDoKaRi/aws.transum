@@ -5,6 +5,7 @@ import SwiftUI
 import Darwin
 
 struct StatusBarView: View {
+    @ObservedObject var viewModel: AppViewModel
     @State private var appCpuUsage: Double = 0
     @State private var systemCpuUsage: Double = 0
     @State private var appMemory: UInt64 = 0
@@ -13,6 +14,19 @@ struct StatusBarView: View {
 
     var body: some View {
         HStack(spacing: 16) {
+            // 左寄せ: プログレスバー＋メッセージ
+            if let message = viewModel.statusMessage {
+                if let progress = viewModel.statusProgress {
+                    ProgressView(value: progress)
+                        .frame(width: 120)
+                } else {
+                    ProgressView()
+                        .controlSize(.small)
+                }
+                Text(message)
+                    .font(.caption2).foregroundStyle(.secondary)
+            }
+
             Spacer()
 
             HStack(spacing: 4) {

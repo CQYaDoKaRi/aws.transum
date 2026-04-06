@@ -40,28 +40,6 @@ struct TranscriptView: View {
             .padding(.horizontal)
             .padding(.top, 12)
 
-            // プログレス表示
-            if viewModel.isTranscribing {
-                VStack(alignment: .leading, spacing: 4) {
-                    ProgressView(value: viewModel.transcriptionProgress)
-                    Text("文字起こし中... \(Int(viewModel.transcriptionProgress * 100))%")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
-                .padding(.horizontal)
-            }
-
-            if viewModel.isSummarizing {
-                VStack(alignment: .leading, spacing: 4) {
-                    ProgressView()
-                        .controlSize(.small)
-                    Text("要約を生成中...")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
-                .padding(.horizontal)
-            }
-
             Divider()
 
             // 結果表示

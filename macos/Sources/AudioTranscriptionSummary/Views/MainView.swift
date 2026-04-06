@@ -38,7 +38,7 @@ struct MainView: View {
             Divider()
             outputArea.layoutPriority(1)
             Divider()
-            StatusBarView()
+            StatusBarView(viewModel: viewModel)
         }
         .frame(minWidth: 900, minHeight: 700)
         .toolbar { toolbarContent }
@@ -54,6 +54,8 @@ struct MainView: View {
         .onAppear { realtimeVM.realtimeTranslationVM = realtimeTranslationVM }
         .onChange(of: viewModel.isCapturingSystemAudio) { _, v in handleCaptureChange(v) }
         .onChange(of: viewModel.isRecordingScreen) { _, v in handleCaptureChange(v) }
+        .onChange(of: viewModel.transcript) { _, _ in transcriptTranslationVM.reset() }
+        .onChange(of: viewModel.summary) { _, _ in summaryTranslationVM.reset() }
     }
 
     // MARK: - ツールバー（左から: 録音/停止 → キャンセル → エクスポート → 設定）

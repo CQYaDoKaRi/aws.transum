@@ -107,7 +107,6 @@
                             <TextBlock x:Name="TimeText" Text="00:00 / 00:00" VerticalAlignment="Center" FontSize="12" Grid.Column="2" />
                         </Grid>
                         <TextBlock x:Name="FileInfoText" Padding="8,2" FontSize="12" Foreground="{ThemeResource SystemControlForegroundBaseMediumBrush}" />
-                        <ProgressBar x:Name="TranscriptionProgressBar" Maximum="100" Value="0" Visibility="Collapsed" Margin="8,4" />
                         <Grid>
                             <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
                             <StackPanel Grid.Column="0" Margin="0,0,4,0">
@@ -172,7 +171,6 @@
                                         <TextBlock Text="要約" />
                                     </StackPanel>
                                 </Button>
-                                <ProgressRing x:Name="SummarizeProgress" IsActive="False" Width="20" Height="20" />
                             </StackPanel>
                         </Grid>
                         <Grid>
@@ -207,7 +205,16 @@
         </ScrollViewer>
 
         <Grid Grid.Row="2" Background="#E0E0E0" Padding="8,3">
-            <TextBlock HorizontalAlignment="Right" FontSize="11" Foreground="#808080">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="*" />
+            </Grid.ColumnDefinitions>
+            <StackPanel x:Name="StatusProgressPanel" Orientation="Horizontal" Spacing="8" Grid.Column="0" Visibility="Collapsed" VerticalAlignment="Center">
+                <ProgressBar x:Name="StatusProgressBar" Width="120" Maximum="100" Value="0" VerticalAlignment="Center" />
+                <ProgressRing x:Name="StatusProgressRing" IsActive="False" Width="14" Height="14" Visibility="Collapsed" />
+                <TextBlock x:Name="StatusProgressText" FontSize="11" Foreground="#808080" VerticalAlignment="Center" />
+            </StackPanel>
+            <TextBlock Grid.Column="1" HorizontalAlignment="Right" FontSize="11" Foreground="#808080">
                 <Run Text="CPU: " /><Run x:Name="AppCpuText" Text="アプリ 0%" /><Run Text=" / " /><Run x:Name="SystemCpuText" Text="全体 0%" /><Run Text="    メモリ: " /><Run x:Name="MemoryText" Text="0 MB / 0 GB (0%)" />
             </TextBlock>
         </Grid>

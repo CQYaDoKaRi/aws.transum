@@ -1,44 +1,63 @@
 // ErrorLogger.swift
 // エラー発生時に詳細情報をファイルに保存するサービス
-// ログは1ファイル（日付時刻.error.log）に集約する
+// 元ファイル名.error.log に追記、ファイル名がない場合は app.error.log に追記
 
 import Foundation
 
 enum ErrorLogger {
 
-    /// 現在のセッション用ログファイル URL（エラー発生時に1回だけ生成）
-    private static let logFileURL: URL = {
-        let dir = AWSSettingsViewModel.exportDirectory ?? AWSSettingsViewModel.recordingDirectory
+    /// ログ出力先ディレクトリを返す
+    private static var logDirectory: URL {
+        AWSSettingsViewModel.exportDirectory ?? AWSSettingsViewModel.recordingDirectory
+    }
+
+    /// 元ファイル名からログファイル URL を決定する
+    /// - Parameter sourceFileName: 処理中のファイル名（nil の場合は app.error.log）
+    private static func logFileURL(sourceFileName: String?) -> URL {
+        let dir = logDirectory
         if !FileManager.default.fileExists(atPath: dir.path) {
             try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
         }
-        let fmt = DateFormatter()
-        fmt.dateFormat = "yyyyMMdd_HHmmss"
-        fmt.locale = Locale(identifier: "en_US_POSIX")
-        let ts = fmt.string(from: Date())
-        return dir.appendingPathComponent("\(ts).error.log")
-    }()
+        if let name = sourceFileName, !name.isEmpty {
+            // 拡張子を除いたベース名.error.log
+            let baseName = (name as NSString).deletingPathExtension
+            return dir.appendingPathComponent("\(baseName).error.log")
+        }
+        return dir.appendingPathComponent("app.error.log")
+    }
 
     /// ログファイルにテキストを追記する共通メソッド
-    private static func writeToLog(_ text: String) {
+    private static func writeToLog(_ text: String, fileURL: URL) {
         guard let data = text.data(using: .utf8) else { return }
-        if FileManager.default.fileExists(atPath: logFileURL.path) {
-            if let handle = try? FileHandle(forWritingTo: logFileURL) {
+        if FileManager.default.fileExists(atPath: fileURL.path) {
+            if let handle = try? FileHandle(forWritingTo: fileURL) {
                 handle.seekToEndOfFile()
                 handle.write(data)
                 handle.closeFile()
             }
         } else {
-            try? data.write(to: logFileURL)
+            try? data.write(to: fileURL)
         }
     }
 
     /// エラーレポートを追記する
-    static func saveErrorLog(error: Error, operation: String, context: [String: String] = [:]) {
+    /// - Parameters:
+    ///   - error: 発生したエラー
+    ///   - operation: 実行中の操作名
+    ///   - sourceFileName: 処理中の元ファイル名（nil の場合は app.error.log に出力）
+    ///   - context: 追加のコンテキスト情報
+    static func saveErrorLog(error: Error, operation: String, sourceFileName: String? = nil, context: [String: String] = [:]) {
+        let fileURL = logFileURL(sourceFileName: sourceFileName)
+
+        let fmt = DateFormatter()
+        fmt.dateFormat = "yyyy-MM-dd HH:mm:ss.SSS"
+        fmt.locale = Locale(identifier: "en_US_POSIX")
+
         var lines: [String] = []
         lines.append("\n=== エラーレポート ===")
-        lines.append("日時: \(Date())")
+        lines.append("日時: \(fmt.string(from: Date()))")
         lines.append("操作: \(operation)")
+        lines.append("処理ファイル: \(sourceFileName ?? "(なし)")")
         lines.append("")
         lines.append("--- エラー概要 ---")
         lines.append("説明: \(error.localizedDescription)")
@@ -115,6 +134,6 @@ enum ErrorLogger {
         lines.append("メモリ: \(ProcessInfo.processInfo.physicalMemory / 1_048_576) MB")
         lines.append("CPU数: \(ProcessInfo.processInfo.processorCount)")
 
-        writeToLog(lines.joined(separator: "\n") + "\n")
+        writeToLog(lines.joined(separator: "\n") + "\n", fileURL: fileURL)
     }
 }

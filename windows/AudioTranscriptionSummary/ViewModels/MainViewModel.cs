@@ -48,6 +48,11 @@ public partial class MainViewModel : ObservableObject
     [ObservableProperty] private AudioSourceInfo? _selectedSource;
     [ObservableProperty] private TranscriptionLanguage _selectedTranscriptionLanguage = TranscriptionLanguage.Auto;
 
+    // ステータスバー進捗表示
+    [ObservableProperty] private string? _progressMessage;
+    [ObservableProperty] private double _statusProgress;
+    [ObservableProperty] private bool _isProgressIndeterminate;
+
     // Status monitor display
     [ObservableProperty] private string _appCpuDisplay = "アプリ 0%";
     [ObservableProperty] private string _systemCpuDisplay = "全体 0%";
@@ -107,6 +112,10 @@ public partial class MainViewModel : ObservableObject
         };
 
         LoadAudioSources();
+
+        // 追加プロンプトを設定から復元
+        var savedSettings = _settingsStore.Load();
+        SummaryAdditionalPrompt = savedSettings.SummaryAdditionalPrompt;
     }
 
     private void LoadAudioSources()
@@ -153,6 +162,8 @@ public partial class MainViewModel : ObservableObject
         ErrorMessage = null;
         _lastOperation = TranscribeAndSummarizeAsync;
         IsTranscribing = true;
+        ProgressMessage = "文字起こし中...";
+        IsProgressIndeterminate = false;
 
         // 文字起こし開始時にテキストクリア
         Transcript = null;
@@ -165,7 +176,12 @@ public partial class MainViewModel : ObservableObject
             TranscriptionProgress = 0;
             var progress = new Progress<double>(p =>
             {
-                _dispatcherQueue.TryEnqueue(() => TranscriptionProgress = p * 100);
+                _dispatcherQueue.TryEnqueue(() =>
+                {
+                    TranscriptionProgress = p * 100;
+                    StatusProgress = p * 100;
+                    ProgressMessage = $"文字起こし中... {p * 100:F0}%";
+                });
             });
 
             var settings = _settingsStore.Load();
@@ -176,6 +192,10 @@ public partial class MainViewModel : ObservableObject
             Transcript = transcript;
 
             IsSummarizing = true;
+            ProgressMessage = "要約を生成中...";
+            IsProgressIndeterminate = true;
+            StatusProgress = 0;
+            SaveAdditionalPrompt();
             try
             {
                 Summary = await _summarizer.SummarizeAsync(transcript, SummaryAdditionalPrompt);
@@ -192,9 +212,9 @@ public partial class MainViewModel : ObservableObject
                 catch (AppError ex) { ErrorMessage = ex.Message; }
             }
         }
-        catch (AppError ex) { ErrorMessage = ex.Message; ErrorLogger.SaveErrorLog(ex, "文字起こし＋要約", new Dictionary<string, string> { ["audioFile"] = AudioFile?.FileName ?? "null" }); }
-        catch (Exception ex) { ErrorMessage = $"処理エラー: {ex.Message}"; ErrorLogger.SaveErrorLog(ex, "文字起こし＋要約_予期しないエラー", new Dictionary<string, string> { ["audioFile"] = AudioFile?.FileName ?? "null" }); }
-        finally { IsSummarizing = false; IsTranscribing = false; }
+        catch (AppError ex) { ErrorMessage = ex.Message; ErrorLogger.SaveErrorLog(ex, "文字起こし＋要約", AudioFile?.FileName); }
+        catch (Exception ex) { ErrorMessage = $"処理エラー: {ex.Message}"; ErrorLogger.SaveErrorLog(ex, "文字起こし＋要約_予期しないエラー", AudioFile?.FileName); }
+        finally { IsSummarizing = false; IsTranscribing = false; ProgressMessage = null; }
     }
 
     [RelayCommand]
@@ -233,6 +253,11 @@ public partial class MainViewModel : ObservableObject
         }
 
         IsSummarizing = true;
+        ProgressMessage = "要約を生成中...";
+        IsProgressIndeterminate = true;
+        StatusProgress = 0;
+        // 追加プロンプトを設定に保存
+        SaveAdditionalPrompt();
         // 要約開始時にクリア
         Summary = null;
         SummaryTranslationVM.Reset();
@@ -246,7 +271,7 @@ public partial class MainViewModel : ObservableObject
         catch (Exception ex)
         {
             ErrorMessage = $"要約に失敗しました: {ex.Message}";
-            ErrorLogger.SaveErrorLog(ex, "要約失敗", new Dictionary<string, string>
+            ErrorLogger.SaveErrorLog(ex, "要約失敗", AudioFile?.FileName, new Dictionary<string, string>
             {
                 ["transcriptLength"] = Transcript?.Text?.Length.ToString() ?? "0",
                 ["additionalPrompt"] = SummaryAdditionalPrompt ?? ""
@@ -255,6 +280,7 @@ public partial class MainViewModel : ObservableObject
         finally
         {
             IsSummarizing = false;
+            ProgressMessage = null;
         }
     }
 
@@ -279,6 +305,10 @@ public partial class MainViewModel : ObservableObject
             );
             Transcript = tempTranscript;
             IsSummarizing = true;
+            ProgressMessage = "要約を生成中...";
+            IsProgressIndeterminate = true;
+            StatusProgress = 0;
+            SaveAdditionalPrompt();
             // 要約開始時にクリア
             Summary = null;
             SummaryTranslationVM.Reset();
@@ -290,14 +320,12 @@ public partial class MainViewModel : ObservableObject
         catch (Exception ex)
         {
             ErrorMessage = $"ファイルからの要約に失敗しました: {ex.Message}";
-            ErrorLogger.SaveErrorLog(ex, "ファイルから要約失敗", new Dictionary<string, string>
-            {
-                ["filePath"] = filePath ?? "null"
-            });
+            ErrorLogger.SaveErrorLog(ex, "ファイルから要約失敗", System.IO.Path.GetFileName(filePath));
         }
         finally
         {
             IsSummarizing = false;
+            ProgressMessage = null;
         }
     }
 
@@ -345,6 +373,9 @@ public partial class MainViewModel : ObservableObject
         {
             _audioCaptureService.StartCapture(SelectedSource);
             IsCapturing = true;
+            ProgressMessage = "音声をキャプチャ中...";
+            IsProgressIndeterminate = true;
+            StatusProgress = 0;
 
             // Store the capture wave format for conversion
             _captureWaveFormat = _audioCaptureService.CaptureWaveFormat;
@@ -432,6 +463,7 @@ public partial class MainViewModel : ObservableObject
 
             var filePath = _audioCaptureService.StopCapture();
             IsCapturing = false;
+            ProgressMessage = null;
             AudioLevel = 0;
 
             // Import the recorded file
@@ -528,11 +560,19 @@ public partial class MainViewModel : ObservableObject
         }
         catch (Exception ex)
         {
-            ErrorLogger.SaveErrorLog(ex, "要約ファイル保存失敗", new Dictionary<string, string>
-            {
-                ["summaryLength"] = Summary.Text.Length.ToString()
-            });
+            ErrorLogger.SaveErrorLog(ex, "要約ファイル保存失敗", AudioFile?.FileName);
         }
+    }
+
+    private void SaveAdditionalPrompt()
+    {
+        try
+        {
+            var settings = _settingsStore.Load();
+            settings.SummaryAdditionalPrompt = SummaryAdditionalPrompt;
+            _settingsStore.Save(settings);
+        }
+        catch { /* 設定保存失敗は無視 */ }
     }
 
     private void UpdateStatus()

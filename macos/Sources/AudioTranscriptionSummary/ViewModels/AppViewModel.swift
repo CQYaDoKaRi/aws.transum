@@ -89,6 +89,23 @@ class AppViewModel: ObservableObject {
     /// 音声抽出中かどうか（動画ファイルから音声を取り出し中）
     @Published var isExtractingAudio: Bool = false
 
+    /// ステータスバー用の進捗値（0.0〜1.0、nil の場合は不定プログレス）
+    var statusProgress: Double? {
+        if isTranscribing { return transcriptionProgress }
+        if isSummarizing || isCapturingSystemAudio || isRecordingScreen || isExtractingAudio { return nil }
+        return nil
+    }
+
+    /// ステータスバー用の進捗メッセージ
+    var statusMessage: String? {
+        if isExtractingAudio { return "音声を抽出中..." }
+        if isTranscribing { return "文字起こし中... \(Int(transcriptionProgress * 100))%" }
+        if isSummarizing { return "要約を生成中..." }
+        if isCapturingSystemAudio { return "システム音声をキャプチャ中..." }
+        if isRecordingScreen { return "画面録画中..." }
+        return nil
+    }
+
     /// キャプチャ中の音声レベル（0.0〜1.0）
     @Published var captureAudioLevel: Float = 0
 
@@ -159,6 +176,8 @@ class AppViewModel: ObservableObject {
         systemAudioCapture.delegate = self
         // 画面録画のデリゲートを設定
         screenRecorder.delegate = self
+        // 追加プロンプトを設定から復元
+        summaryAdditionalPrompt = AppSettingsStore().load().summaryAdditionalPrompt
     }
 
     // MARK: - deinit
@@ -201,9 +220,11 @@ class AppViewModel: ObservableObject {
         } catch let error as AppError {
             isExtractingAudio = false
             errorMessage = error.errorDescription
+            ErrorLogger.saveErrorLog(error: error, operation: "ファイル読み込み", sourceFileName: url.lastPathComponent)
         } catch {
             isExtractingAudio = false
             errorMessage = error.localizedDescription
+            ErrorLogger.saveErrorLog(error: error, operation: "ファイル読み込み", sourceFileName: url.lastPathComponent)
         }
     }
 
@@ -238,8 +259,10 @@ class AppViewModel: ObservableObject {
             transcriptionProgress = 1.0
         } catch let error as AppError {
             errorMessage = error.errorDescription
+            ErrorLogger.saveErrorLog(error: error, operation: "文字起こし", sourceFileName: audioFile?.fileName)
         } catch {
             errorMessage = error.localizedDescription
+            ErrorLogger.saveErrorLog(error: error, operation: "文字起こし", sourceFileName: audioFile?.fileName)
         }
 
         isTranscribing = false
@@ -263,13 +286,21 @@ class AppViewModel: ObservableObject {
         summary = nil
         lastOperation = .summarization
 
+        // 追加プロンプトを設定に保存
+        let store = AppSettingsStore()
+        var settings = store.load()
+        settings.summaryAdditionalPrompt = summaryAdditionalPrompt
+        try? store.save(settings)
+
         do {
             let result = try await summarizer.summarize(transcript: transcript, additionalPrompt: summaryAdditionalPrompt)
             summary = result
         } catch let error as AppError {
             errorMessage = error.errorDescription
+            ErrorLogger.saveErrorLog(error: error, operation: "要約", sourceFileName: audioFile?.fileName)
         } catch {
             errorMessage = error.localizedDescription
+            ErrorLogger.saveErrorLog(error: error, operation: "要約", sourceFileName: audioFile?.fileName)
         }
         isSummarizing = false
     }
@@ -292,6 +323,7 @@ class AppViewModel: ObservableObject {
                 lastSummaryPath = summaryURL.path
             } catch {
                 errorMessage = "要約ファイルの保存に失敗しました: \(error.localizedDescription)"
+                ErrorLogger.saveErrorLog(error: error, operation: "要約ファイル保存", sourceFileName: audioFile?.fileName)
             }
         }
     }
@@ -326,6 +358,7 @@ class AppViewModel: ObservableObject {
             }
         } catch {
             errorMessage = "ファイルの読み込みに失敗しました: \(error.localizedDescription)"
+            ErrorLogger.saveErrorLog(error: error, operation: "ファイルから要約", sourceFileName: url.lastPathComponent)
         }
     }
 
@@ -379,6 +412,7 @@ class AppViewModel: ObservableObject {
             }
         } catch {
             errorMessage = "エクスポートに失敗しました: \(error.localizedDescription)"
+            ErrorLogger.saveErrorLog(error: error, operation: "自動エクスポート", sourceFileName: audioFile?.fileName)
         }
     }
 
@@ -401,8 +435,10 @@ class AppViewModel: ObservableObject {
             )
         } catch let error as AppError {
             errorMessage = error.errorDescription
+            ErrorLogger.saveErrorLog(error: error, operation: "エクスポート", sourceFileName: audioFile?.fileName)
         } catch {
             errorMessage = error.localizedDescription
+            ErrorLogger.saveErrorLog(error: error, operation: "エクスポート", sourceFileName: audioFile?.fileName)
         }
     }
 

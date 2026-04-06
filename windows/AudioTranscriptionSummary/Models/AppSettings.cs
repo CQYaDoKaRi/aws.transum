@@ -33,4 +33,7 @@ public class AppSettings
 
     [JsonPropertyName("bedrockModelId")]
     public string BedrockModelId { get; set; } = "anthropic.claude-sonnet-4-6";
+
+    [JsonPropertyName("summaryAdditionalPrompt")]
+    public string SummaryAdditionalPrompt { get; set; } = "";
 }

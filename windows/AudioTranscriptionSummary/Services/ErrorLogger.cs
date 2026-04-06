@@ -1,6 +1,6 @@
 // ErrorLogger.cs
 // エラー発生時に詳細情報をファイルに保存するサービス
-// ログは1ファイル（日付時刻.error.log）に集約する（Mac版と同じ形式）
+// 元ファイル名.error.log に追記、ファイル名がない場合は app.error.log に追記
 
 using System;
 using System.Collections.Generic;
@@ -14,7 +14,10 @@ namespace AudioTranscriptionSummary.Services;
 
 public static class ErrorLogger
 {
-    private static readonly Lazy<string> _logFilePath = new(() =>
+    /// <summary>
+    /// ログ出力先ディレクトリを返す
+    /// </summary>
+    private static string GetLogDirectory()
     {
         var settings = new SettingsStore().Load();
         var dir = !string.IsNullOrEmpty(settings.ExportDirectoryPath)
@@ -26,14 +29,31 @@ public static class ErrorLogger
         if (!Directory.Exists(dir))
             Directory.CreateDirectory(dir);
 
-        var timestamp = DateTime.Now.ToString("yyyyMMdd_HHmmss");
-        return Path.Combine(dir, $"{timestamp}.error.log");
-    });
+        return dir;
+    }
+
+    /// <summary>
+    /// 元ファイル名からログファイルパスを決定する
+    /// </summary>
+    private static string GetLogFilePath(string? sourceFileName)
+    {
+        var dir = GetLogDirectory();
+        if (!string.IsNullOrEmpty(sourceFileName))
+        {
+            var baseName = Path.GetFileNameWithoutExtension(sourceFileName);
+            return Path.Combine(dir, $"{baseName}.error.log");
+        }
+        return Path.Combine(dir, "app.error.log");
+    }
 
     /// <summary>
     /// エラーレポートをログファイルに追記する
     /// </summary>
-    public static void SaveErrorLog(Exception error, string operation, Dictionary<string, string>? context = null)
+    /// <param name="error">発生した例外</param>
+    /// <param name="operation">実行中の操作名</param>
+    /// <param name="sourceFileName">処理中の元ファイル名（null の場合は app.error.log に出力）</param>
+    /// <param name="context">追加のコンテキスト情報</param>
+    public static void SaveErrorLog(Exception error, string operation, string? sourceFileName = null, Dictionary<string, string>? context = null)
     {
         try
         {
@@ -42,6 +62,7 @@ public static class ErrorLogger
             sb.AppendLine("=== エラーレポート ===");
             sb.AppendLine($"日時: {DateTime.Now:yyyy-MM-dd HH:mm:ss.fff}");
             sb.AppendLine($"操作: {operation}");
+            sb.AppendLine($"処理ファイル: {sourceFileName ?? "(なし)"}");
             sb.AppendLine();
 
             // エラー概要
@@ -113,7 +134,7 @@ public static class ErrorLogger
             sb.AppendLine($"CPU数: {Environment.ProcessorCount}");
             sb.AppendLine();
 
-            File.AppendAllText(_logFilePath.Value, sb.ToString(), Encoding.UTF8);
+            File.AppendAllText(GetLogFilePath(sourceFileName), sb.ToString(), Encoding.UTF8);
         }
         catch
         {

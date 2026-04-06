@@ -52,7 +52,7 @@ public class Summarizer
                 var modelId = string.IsNullOrEmpty(settings.BedrockModelId)
                     ? BedrockModel.DefaultModelId : settings.BedrockModelId;
                 var logModel = BedrockModel.Find(modelId);
-                ErrorLogger.SaveErrorLog(ex, "Bedrock要約失敗_フォールバック", new Dictionary<string, string>
+                ErrorLogger.SaveErrorLog(ex, "Bedrock要約失敗_フォールバック", null, new Dictionary<string, string>
                 {
                     ["modelId"] = modelId,
                     ["inferenceId"] = logModel?.GetInferenceId(settings.Region) ?? modelId,

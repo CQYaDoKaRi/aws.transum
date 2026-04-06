@@ -90,6 +90,9 @@ public sealed partial class MainPage : Page
         TranscribeButton.IsEnabled = false;
         TranscriptionLangCombo.IsEnabled = false;
 
+        // 追加プロンプトを復元
+        SummaryPromptBox.Text = _vm.SummaryAdditionalPrompt;
+
         // テキストエリアのリサイズ対応
         this.SizeChanged += OnPageSizeChanged;
 
@@ -116,11 +119,6 @@ public sealed partial class MainPage : Page
                     CopySummaryBtn.IsEnabled = !string.IsNullOrEmpty(_vm.Summary?.Text);
                     TranslateSummaryBtn.IsEnabled = !string.IsNullOrEmpty(_vm.Summary?.Text);
                     break;
-                case nameof(MainViewModel.TranscriptionProgress):
-                    TranscriptionProgressBar.Value = _vm.TranscriptionProgress;
-                    TranscriptionProgressBar.Visibility = _vm.TranscriptionProgress > 0 && _vm.TranscriptionProgress < 100
-                        ? Visibility.Visible : Visibility.Collapsed;
-                    break;
                 case nameof(MainViewModel.IsTranscribing):
                     TranscribeButton.IsEnabled = _vm.AudioFile != null && !_vm.IsTranscribing;
                     TranscriptionLangCombo.IsEnabled = _vm.AudioFile != null && !_vm.IsTranscribing;
@@ -130,11 +128,15 @@ public sealed partial class MainPage : Page
                 case nameof(MainViewModel.IsSummarizing):
                     SummaryFileBtn.IsEnabled = !_vm.IsSummarizing && !_vm.IsTranscribing;
                     ResummarizeBtn.IsEnabled = !_vm.IsSummarizing && !_vm.IsTranscribing;
-                    SummarizeProgress.IsActive = _vm.IsSummarizing;
                     break;
                 case nameof(MainViewModel.ErrorMessage):
                     if (_vm.ErrorMessage != null)
                         ShowErrorDialog(_vm.ErrorMessage);
+                    break;
+                case nameof(MainViewModel.ProgressMessage):
+                case nameof(MainViewModel.StatusProgress):
+                case nameof(MainViewModel.IsProgressIndeterminate):
+                    UpdateStatusProgress();
                     break;
                 case nameof(MainViewModel.AudioFile):
                     UpdateFileInfo();
@@ -738,5 +740,29 @@ public sealed partial class MainPage : Page
         };
 
         await dialog.ShowAsync();
+    }
+
+    // ステータスバー進捗表示の更新
+    private void UpdateStatusProgress()
+    {
+        var hasMessage = !string.IsNullOrEmpty(_vm.ProgressMessage);
+        StatusProgressPanel.Visibility = hasMessage ? Visibility.Visible : Visibility.Collapsed;
+        if (hasMessage)
+        {
+            StatusProgressText.Text = _vm.ProgressMessage;
+            if (_vm.IsProgressIndeterminate)
+            {
+                StatusProgressBar.Visibility = Visibility.Collapsed;
+                StatusProgressRing.Visibility = Visibility.Visible;
+                StatusProgressRing.IsActive = true;
+            }
+            else
+            {
+                StatusProgressBar.Visibility = Visibility.Visible;
+                StatusProgressBar.Value = _vm.StatusProgress;
+                StatusProgressRing.Visibility = Visibility.Collapsed;
+                StatusProgressRing.IsActive = false;
+            }
+        }
     }
 }

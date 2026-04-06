@@ -14,6 +14,10 @@ windows/AudioTranscriptionSummary/bin/
 windows/AudioTranscriptionSummary/obj/
 windows/installer/output/
 
+# Test data files
+test/data/*
+!test/data/.gitkeep
+
 # Test build output
 test/windows/AudioTranscriptionSummary.Tests/bin/
 test/windows/AudioTranscriptionSummary.Tests/obj/

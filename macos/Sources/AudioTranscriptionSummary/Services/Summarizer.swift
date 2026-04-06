@@ -5,6 +5,7 @@
 import Foundation
 import NaturalLanguage
 import AWSBedrockRuntime
+import AWSSDKIdentity
 
 final class Summarizer: Summarizing, @unchecked Sendable {
 
@@ -24,7 +25,23 @@ final class Summarizer: Summarizing, @unchecked Sendable {
                 let summaryText = try await summarizeWithBedrock(text: transcript.text, additionalPrompt: additionalPrompt)
                 return Summary(id: UUID(), transcriptId: transcript.id, text: summaryText, createdAt: Date())
             } catch {
-                ErrorLogger.saveErrorLog(error: error, operation: "Bedrock要約失敗_フォールバック", context: [:])
+                // Bedrock エラーの詳細を取得
+                let modelId = AWSSettingsViewModel.currentBedrockModelId
+                let modelName = BedrockModel.find(by: modelId)?.name ?? modelId
+                let region = AWSSettingsViewModel.currentRegion
+                let errorDetail = "\(error)"
+
+                ErrorLogger.saveErrorLog(error: error, operation: "Bedrock要約失敗_フォールバック",
+                    context: ["modelId": modelId, "region": region, "detail": errorDetail])
+
+                // ValidationException の場合はモデルアクセスの問題を示唆
+                if errorDetail.contains("ValidationException") {
+                    throw AppError.summarizationFailed(
+                        underlying: NSError(domain: "Summarizer", code: -3,
+                            userInfo: [NSLocalizedDescriptionKey: "Bedrock モデル「\(modelName)」が利用できません。AWS コンソールの Bedrock > Model access でモデルへのアクセスを有効化してください。リージョン: \(region)"]))
+                }
+
+                // その他のエラーはフォールバック
             }
         }
 
@@ -36,10 +53,30 @@ final class Summarizer: Summarizing, @unchecked Sendable {
 
     private func summarizeWithBedrock(text: String, additionalPrompt: String = "") async throws -> String {
         let region = AWSSettingsViewModel.currentRegion
-        let config = try await BedrockRuntimeClient.BedrockRuntimeClientConfiguration(region: region)
+
+        // アプリ設定の認証情報を使用
+        guard let credentials = AWSSettingsViewModel.loadAWSCredentials() else {
+            throw AppError.summarizationFailed(
+                underlying: NSError(domain: "Summarizer", code: -2,
+                                    userInfo: [NSLocalizedDescriptionKey: "AWS 認証情報が設定されていません"]))
+        }
+
+        let config = try await BedrockRuntimeClient.BedrockRuntimeClientConfiguration(
+            awsCredentialIdentityResolver: try StaticAWSCredentialIdentityResolver(
+                .init(accessKey: credentials.accessKeyId, secret: credentials.secretAccessKey)
+            ),
+            region: region
+        )
         let client = BedrockRuntimeClient(config: config)
 
-        let modelId = AWSSettingsViewModel.currentBedrockModelId
+        // リージョンに応じた推論 ID を取得（Cross-Region inference 対応）
+        let settingsModelId = AWSSettingsViewModel.currentBedrockModelId
+        let modelId: String
+        if let model = BedrockModel.find(by: settingsModelId) {
+            modelId = model.inferenceId(for: region)
+        } else {
+            modelId = settingsModelId
+        }
 
         // プロンプト
         var prompt = """

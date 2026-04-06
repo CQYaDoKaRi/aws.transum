@@ -16,6 +16,9 @@ struct AudioTranscriptionSummaryApp: App {
     @StateObject private var appViewModel: AppViewModel
 
     init() {
+        // Dock にアプリアイコンを表示する
+        NSApplication.shared.setActivationPolicy(.regular)
+
         let settingsVM = AWSSettingsViewModel()
         _awsSettingsViewModel = StateObject(wrappedValue: settingsVM)
 

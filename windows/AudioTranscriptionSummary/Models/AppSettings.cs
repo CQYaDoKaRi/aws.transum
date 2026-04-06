@@ -32,5 +32,5 @@ public class AppSettings
     public string DefaultTargetLanguage { get; set; } = "ja";
 
     [JsonPropertyName("bedrockModelId")]
-    public string BedrockModelId { get; set; } = "anthropic.claude-sonnet-4-6-20260617-v1:0";
+    public string BedrockModelId { get; set; } = "anthropic.claude-sonnet-4-6";
 }

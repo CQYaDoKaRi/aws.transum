@@ -251,6 +251,11 @@ class AppViewModel: ObservableObject {
     /// 追加プロンプト（要約時に使用）
     @Published var summaryAdditionalPrompt: String = ""
 
+    /// 設定で選択されている Bedrock 基盤モデル ID
+    var awsSettingsBedrockModelId: String {
+        AWSSettingsViewModel.currentBedrockModelId
+    }
+
     /// 要約を開始する
     func startSummarization() async {
         guard let transcript = transcript else { return }
@@ -271,9 +276,58 @@ class AppViewModel: ObservableObject {
     }
 
     /// 要約のみ再実行する（文字起こし結果が既にある場合）
+    /// 追加プロンプトを参照し、要約結果をファイルにも保存する
     func resummarize() async {
         guard transcript != nil else { return }
         await startSummarization()
+
+        // 要約結果をファイルに保存（エクスポート先が設定済みの場合）
+        if let exportDir = AWSSettingsViewModel.exportDirectory, let summary = summary {
+            let baseName = audioFile?.fileName ?? "transcript"
+            let summaryURL = exportDir.appendingPathComponent("\(baseName).summary.txt")
+            do {
+                if !FileManager.default.fileExists(atPath: exportDir.path) {
+                    try FileManager.default.createDirectory(at: exportDir, withIntermediateDirectories: true)
+                }
+                try summary.text.write(to: summaryURL, atomically: true, encoding: .utf8)
+                lastSummaryPath = summaryURL.path
+            } catch {
+                errorMessage = "要約ファイルの保存に失敗しました: \(error.localizedDescription)"
+            }
+        }
+    }
+
+    /// テキストファイルを読み込んで要約する
+    func summarizeFromFile(url: URL) async {
+        do {
+            let text = try String(contentsOf: url, encoding: .utf8)
+            guard !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+                errorMessage = "ファイルが空です"
+                return
+            }
+            let tempTranscript = Transcript(
+                id: UUID(),
+                audioFileId: audioFile?.id ?? UUID(),
+                text: text,
+                language: .auto,
+                createdAt: Date()
+            )
+            transcript = tempTranscript
+            await startSummarization()
+
+            // 要約結果をファイルに保存
+            if let exportDir = AWSSettingsViewModel.exportDirectory, let summary = summary {
+                let baseName = url.deletingPathExtension().lastPathComponent
+                let summaryURL = exportDir.appendingPathComponent("\(baseName).summary.txt")
+                if !FileManager.default.fileExists(atPath: exportDir.path) {
+                    try FileManager.default.createDirectory(at: exportDir, withIntermediateDirectories: true)
+                }
+                try summary.text.write(to: summaryURL, atomically: true, encoding: .utf8)
+                lastSummaryPath = summaryURL.path
+            }
+        } catch {
+            errorMessage = "ファイルの読み込みに失敗しました: \(error.localizedDescription)"
+        }
     }
 
     // MARK: - 文字起こし + 要約 + 自動エクスポート（一括実行）

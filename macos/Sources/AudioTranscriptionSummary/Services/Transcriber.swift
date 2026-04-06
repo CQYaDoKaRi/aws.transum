@@ -43,7 +43,9 @@ final class Transcriber: Transcribing, @unchecked Sendable {
         onProgress: @escaping @Sendable (Double) -> Void
     ) async throws -> Transcript {
         // 1. SFSpeechRecognizer の初期化（指定言語のロケールを使用）
-        let locale = Locale(identifier: language.rawValue)
+        // auto の場合は日本語にフォールバック（SFSpeechRecognizer は auto 非対応）
+        let langCode = language == .auto ? "ja-JP" : language.rawValue
+        let locale = Locale(identifier: langCode)
         guard let recognizer = SFSpeechRecognizer(locale: locale) else {
             throw AppError.transcriptionFailed(
                 underlying: NSError(

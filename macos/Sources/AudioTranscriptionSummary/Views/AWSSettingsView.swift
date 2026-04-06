@@ -147,9 +147,22 @@ struct AWSSettingsView: View {
                     settingsGroup(title: "要約（Bedrock）", icon: "doc.text.magnifyingglass") {
                         settingsRow("基盤モデル") {
                             Picker("", selection: $viewModel.bedrockModelId) {
-                                ForEach(BedrockModel.available) { model in
+                                ForEach(BedrockModel.availableModels(for: viewModel.region)) { model in
                                     Text("\(model.name) (\(model.provider))").tag(model.id)
                                 }
+                            }
+                            .onChange(of: viewModel.bedrockModelId) { _, _ in
+                                // モデル変更時に即座に保存
+                                viewModel.saveCredentials()
+                            }
+                            .onChange(of: viewModel.region) { _, newRegion in
+                                let models = BedrockModel.availableModels(for: newRegion)
+                                if !models.contains(where: { $0.id == viewModel.bedrockModelId }),
+                                   let first = models.first {
+                                    viewModel.bedrockModelId = first.id
+                                }
+                                // リージョン変更時に即座に保存
+                                viewModel.saveCredentials()
                             }
                         }
                     }

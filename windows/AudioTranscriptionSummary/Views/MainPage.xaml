@@ -149,17 +149,29 @@
                         </Border>
                     </Expander.Header>
                     <StackPanel Margin="0,4">
-                        <!-- 追加プロンプト + 要約し直すボタン -->
+                        <!-- 基盤モデル表示 + プロンプト + ボタン -->
+                        <StackPanel Orientation="Horizontal" Spacing="4" Margin="4,0,4,4">
+                            <FontIcon Glyph="&#xE950;" FontSize="12" Foreground="Gray" />
+                            <TextBlock x:Name="BedrockModelLabel" Text="ローカル要約" FontSize="11" Foreground="Gray" />
+                        </StackPanel>
                         <Grid Margin="4,0,4,4">
-                            <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
+                            <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="110" /></Grid.ColumnDefinitions>
                             <TextBox x:Name="SummaryPromptBox" Grid.Column="0" PlaceholderText="追加プロンプト（例: 箇条書きで要約して）"
                                      AcceptsReturn="True" TextWrapping="Wrap" MinHeight="40" MaxHeight="80" />
-                            <Button Grid.Column="1" Click="OnResummarizeClick" Margin="4,0,0,0" VerticalAlignment="Top">
-                                <StackPanel Orientation="Horizontal" Spacing="4">
-                                    <FontIcon Glyph="&#xE72C;" FontSize="12" />
-                                    <TextBlock Text="要約し直す" />
-                                </StackPanel>
-                            </Button>
+                            <StackPanel Grid.Column="1" Spacing="4" Margin="4,0,0,0">
+                                <Button Click="OnSummaryFileClick" HorizontalAlignment="Stretch">
+                                    <StackPanel Orientation="Horizontal" Spacing="4" HorizontalAlignment="Center">
+                                        <FontIcon Glyph="&#xE8E5;" FontSize="12" />
+                                        <TextBlock Text="ファイルから" />
+                                    </StackPanel>
+                                </Button>
+                                <Button Click="OnResummarizeClick" HorizontalAlignment="Stretch">
+                                    <StackPanel Orientation="Horizontal" Spacing="4" HorizontalAlignment="Center">
+                                        <FontIcon Glyph="&#xE8A5;" FontSize="12" />
+                                        <TextBlock Text="要約" />
+                                    </StackPanel>
+                                </Button>
+                            </StackPanel>
                         </Grid>
                         <Grid>
                             <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>

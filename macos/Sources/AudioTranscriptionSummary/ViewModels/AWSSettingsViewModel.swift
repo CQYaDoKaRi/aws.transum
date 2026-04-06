@@ -133,6 +133,18 @@ class AWSSettingsViewModel: ObservableObject {
         defaultTargetLanguage = TranslationLanguage(rawValue: settings.defaultTargetLanguage) ?? .japanese
         bedrockModelId = settings.bedrockModelId
         isSaved = !settings.accessKeyId.isEmpty && !settings.secretAccessKey.isEmpty
+
+        // 保存済みモデルがリージョンで利用不可、またはモデルリストに存在しない場合は自動切り替え
+        let models = BedrockModel.availableModels(for: region)
+        if BedrockModel.find(by: bedrockModelId) == nil || !models.contains(where: { $0.id == bedrockModelId }) {
+            if let first = models.first {
+                bedrockModelId = first.id
+                // 修正した設定を直接ファイルに保存
+                var fixedSettings = settings
+                fixedSettings.bedrockModelId = first.id
+                try? Self.settingsStore.save(fixedSettings)
+            }
+        }
     }
 
     // MARK: - JSON ファイルへの保存

@@ -2,6 +2,7 @@
 // 上部: 入力（録音コントロール）、下部: 折りたたみ可能な文字起こし・翻訳セクション
 
 import SwiftUI
+import UniformTypeIdentifiers
 
 struct MainView: View {
     @ObservedObject var viewModel: AppViewModel
@@ -16,6 +17,7 @@ struct MainView: View {
     @State private var isRealtimeExpanded = true
     @State private var isTranscriptExpanded = true
     @State private var isSummaryExpanded = true
+    @State private var showSummaryFileImporter = false
 
     private var showErrorAlert: Binding<Bool> {
         Binding(
@@ -167,33 +169,62 @@ struct MainView: View {
                 Divider()
                 collapsibleSection(title: "要約", icon: "doc.text", isExpanded: $isSummaryExpanded) {
                     VStack(spacing: 0) {
-                        // 追加プロンプト入力 + 要約し直すボタン
-                        HStack(spacing: 6) {
-                            TextEditor(text: $viewModel.summaryAdditionalPrompt)
-                                .font(.caption)
-                                .frame(height: 50)
-                                .overlay(
-                                    RoundedRectangle(cornerRadius: 4)
-                                        .stroke(Color(.separatorColor), lineWidth: 1)
-                                )
-                                .overlay(alignment: .topLeading) {
-                                    if viewModel.summaryAdditionalPrompt.isEmpty {
-                                        Text("追加プロンプト（例: 箇条書きで要約して）")
-                                            .font(.caption).foregroundStyle(.tertiary)
-                                            .padding(.horizontal, 4).padding(.top, 6)
-                                            .allowsHitTesting(false)
-                                    }
-                                }
-                            Button {
-                                Task { await viewModel.resummarize() }
-                            } label: {
-                                Label("要約し直す", systemImage: "arrow.clockwise")
-                                    .font(.caption)
+                        // 基盤モデル表示 + プロンプト + ボタン
+                        VStack(alignment: .leading, spacing: 4) {
+                            // 利用する基盤モデル表示
+                            HStack(spacing: 4) {
+                                Image(systemName: "cpu").font(.caption2).foregroundStyle(.secondary)
+                                Text(BedrockModel.find(by: viewModel.awsSettingsBedrockModelId)?.name ?? "ローカル要約")
+                                    .font(.caption2).foregroundStyle(.secondary)
                             }
-                            .disabled(viewModel.transcript == nil || viewModel.isSummarizing)
-                            .controlSize(.small)
+                            .padding(.horizontal, 8).padding(.top, 4)
+
+                            HStack(spacing: 6) {
+                                TextEditor(text: $viewModel.summaryAdditionalPrompt)
+                                    .font(.caption)
+                                    .frame(height: 50)
+                                    .overlay(
+                                        RoundedRectangle(cornerRadius: 4)
+                                            .stroke(Color(.separatorColor), lineWidth: 1)
+                                    )
+                                    .overlay(alignment: .topLeading) {
+                                        if viewModel.summaryAdditionalPrompt.isEmpty {
+                                            Text("追加プロンプト（例: 箇条書きで要約して）")
+                                                .font(.caption).foregroundStyle(.tertiary)
+                                                .padding(.horizontal, 4).padding(.top, 6)
+                                                .allowsHitTesting(false)
+                                        }
+                                    }
+                                VStack(spacing: 4) {
+                                    Button {
+                                        showSummaryFileImporter = true
+                                    } label: {
+                                        Label("ファイルから", systemImage: "doc.text")
+                                            .font(.caption).frame(maxWidth: .infinity)
+                                    }
+                                    .controlSize(.small)
+                                    Button {
+                                        Task { await viewModel.resummarize() }
+                                    } label: {
+                                        Label("要約", systemImage: "text.magnifyingglass")
+                                            .font(.caption).frame(maxWidth: .infinity)
+                                    }
+                                    .disabled(viewModel.transcript == nil || viewModel.isSummarizing)
+                                    .controlSize(.small)
+                                }
+                                .frame(width: 110)
+                            }
+                            .padding(.horizontal, 8).padding(.bottom, 4)
                         }
-                        .padding(.horizontal, 8).padding(.vertical, 4)
+                        .fileImporter(isPresented: $showSummaryFileImporter, allowedContentTypes: [.plainText, .text], allowsMultipleSelection: false) { result in
+                            if case .success(let urls) = result, let url = urls.first {
+                                let accessed = url.startAccessingSecurityScopedResource()
+                                Task {
+                                    await viewModel.summarizeFromFile(url: url)
+                                    if accessed { url.stopAccessingSecurityScopedResource() }
+                                }
+                            }
+                        }
                         Divider()
                         HStack(spacing: 0) {
                             SummaryView(viewModel: viewModel).frame(maxWidth: .infinity, maxHeight: .infinity)

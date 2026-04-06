@@ -248,42 +248,6 @@ public sealed partial class MainPage : Page
     private void OnStopRecordClick(object sender, RoutedEventArgs e) => _vm.StopCaptureCommand.Execute(null);
     private void OnCancelClick(object sender, RoutedEventArgs e) => _vm.CancelCaptureCommand.Execute(null);
 
-    // Export
-    private async void OnExportClick(object sender, RoutedEventArgs e)
-    {
-        if (_vm.Transcript == null) return;
-
-        var settings = new SettingsStore().Load();
-        if (string.IsNullOrEmpty(settings.ExportDirectoryPath))
-        {
-            var picker = new FolderPicker();
-            picker.SuggestedStartLocation = PickerLocationId.DocumentsLibrary;
-            picker.FileTypeFilter.Add("*");
-
-            var hwnd = GetWindowHandle();
-            if (hwnd != IntPtr.Zero)
-                WinRT.Interop.InitializeWithWindow.Initialize(picker, hwnd);
-
-            var folder = await picker.PickSingleFolderAsync();
-            if (folder != null)
-            {
-                try
-                {
-                    var exportMgr = new ExportManager();
-                    exportMgr.Export(_vm.Transcript, _vm.Summary, folder.Path);
-                }
-                catch (AppError ex)
-                {
-                    _vm.ErrorMessage = ex.Message;
-                }
-            }
-        }
-        else
-        {
-            _vm.ExportCommand.Execute(null);
-        }
-    }
-
     // Transcribe
     private void OnTranscribeClick(object sender, RoutedEventArgs e)
         => _vm.TranscribeAndSummarizeCommand.Execute(null);

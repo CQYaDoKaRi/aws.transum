@@ -13,7 +13,6 @@ struct MainView: View {
     @StateObject private var summaryTranslationVM = TranslationViewModel()
 
     @State private var showSettings = false
-    @State private var showSaveConfirmation = false
     @State private var isRealtimeExpanded = true
     @State private var isTranscriptExpanded = true
     @State private var isSummaryExpanded = true
@@ -52,9 +51,6 @@ struct MainView: View {
                 Button("閉じる", role: .cancel) { viewModel.errorMessage = nil }
             }
         } message: { Text(viewModel.errorMessage ?? "") }
-        .alert("保存完了", isPresented: $showSaveConfirmation) {
-            Button("OK", role: .cancel) {}
-        } message: { Text("保存しました") }
         .onAppear { realtimeVM.realtimeTranslationVM = realtimeTranslationVM }
         .onChange(of: viewModel.isCapturingSystemAudio) { _, v in handleCaptureChange(v) }
         .onChange(of: viewModel.isRecordingScreen) { _, v in handleCaptureChange(v) }
@@ -95,10 +91,6 @@ struct MainView: View {
                 } label: { Image(systemName: "xmark.circle").font(.title3) }
                     .help("キャンセル")
             }
-        }
-        // エクスポート
-        ToolbarItem(placement: .primaryAction) {
-            EmptyView() // エクスポートは自動保存のため不要
         }
         // 設定（右端）
         ToolbarItem(placement: .primaryAction) {
@@ -308,19 +300,4 @@ struct MainView: View {
         }
     }
 
-    // MARK: - エクスポート
-
-    private func exportResults() {
-        guard viewModel.transcript != nil else { return }
-        if let dir = AWSSettingsViewModel.exportDirectory {
-            Task { await viewModel.exportResults(to: dir); if viewModel.errorMessage == nil { showSaveConfirmation = true } }
-            return
-        }
-        let panel = NSSavePanel()
-        panel.title = "エクスポート先を選択"
-        panel.nameFieldStringValue = "\(viewModel.audioFile?.fileName ?? "transcript").transcript.txt"
-        panel.allowedContentTypes = [.plainText]; panel.canCreateDirectories = true
-        guard panel.runModal() == .OK, let url = panel.url else { return }
-        Task { await viewModel.exportResults(to: url.deletingLastPathComponent()); if viewModel.errorMessage == nil { showSaveConfirmation = true } }
-    }
 }

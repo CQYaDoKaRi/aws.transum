@@ -123,7 +123,6 @@ class AppViewModel: ObservableObject {
     enum ConvertingStatus: Equatable {
         case idle
         case saving       // RAW 保存中
-        case converting   // 形式変換中
         case completed    // 完了
     }
     @Published var convertingStatus: ConvertingStatus = .idle

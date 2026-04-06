@@ -5,8 +5,6 @@ import SwiftUI
 
 struct SystemAudioCaptureView: View {
     @ObservedObject var viewModel: AppViewModel
-    @State private var elapsedTime: TimeInterval = 0
-    @State private var timer: Timer?
 
     private var isAnyCapturing: Bool {
         viewModel.isCapturingSystemAudio || viewModel.isRecordingScreen
@@ -47,12 +45,6 @@ struct SystemAudioCaptureView: View {
         .padding(4)
         .background(RoundedRectangle(cornerRadius: 8).fill(Color(.controlBackgroundColor)))
         .task { await viewModel.refreshAudioSources() }
-        .onChange(of: viewModel.isCapturingSystemAudio) { _, capturing in
-            if capturing { startTimer() } else { stopTimer() }
-        }
-        .onChange(of: viewModel.isRecordingScreen) { _, recording in
-            if recording { startTimer() } else { stopTimer() }
-        }
     }
 
     private func levelGauge(level: Float) -> some View {
@@ -68,20 +60,4 @@ struct SystemAudioCaptureView: View {
         .frame(height: 6)
     }
 
-    private var currentLevel: Float {
-        viewModel.isCapturingSystemAudio ? viewModel.captureAudioLevel : viewModel.screenRecordingAudioLevel
-    }
-
-    private func formatTime(_ t: TimeInterval) -> String {
-        let s = Int(max(t, 0)); return String(format: "%02d:%02d", s / 60, s % 60)
-    }
-
-    private func startTimer() {
-        elapsedTime = 0
-        timer = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { _ in
-            Task { @MainActor in elapsedTime += 1 }
-        }
-    }
-
-    private func stopTimer() { timer?.invalidate(); timer = nil; elapsedTime = 0 }
 }

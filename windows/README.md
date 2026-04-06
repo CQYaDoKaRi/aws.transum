@@ -56,6 +56,7 @@ windows/AudioTranscriptionSummary/
 │   ├── TranscriptionLanguage.cs
 │   └── TranslationLanguage.cs
 ├── Services/
+│   ├── AppIconGenerator.cs
 │   ├── AudioBufferConverter.cs
 │   ├── AudioCaptureService.cs
 │   ├── AudioPlayerService.cs
@@ -63,6 +64,7 @@ windows/AudioTranscriptionSummary/
 │   ├── ExportManager.cs
 │   ├── FileImporter.cs
 │   ├── RealtimeTranscribeClient.cs
+│   ├── S3Service.cs
 │   ├── SettingsStore.cs
 │   ├── StatusMonitor.cs
 │   ├── Summarizer.cs
@@ -73,6 +75,8 @@ windows/AudioTranscriptionSummary/
 │   ├── RealtimeTranscriptionViewModel.cs
 │   └── TranslationViewModel.cs
 ├── Views/
+│   ├── AudioPlayerControl.xaml
+│   ├── AudioPlayerControl.xaml.cs
 │   ├── MainPage.xaml
 │   └── MainPage.xaml.cs
 └── AudioTranscriptionSummary.csproj
@@ -93,6 +97,31 @@ windows/AudioTranscriptionSummary/
 ## ビルド
 
 ```powershell
-cd windows\AudioTranscriptionSummary
-dotnet build -c Release -p:Platform=x64
+# VS Community MSBuild を使用（WinUI 3 の PRI タスクに必要）
+& "C:\Program Files\Microsoft Visual Studio\2022\Community\MSBuild\Current\Bin\MSBuild.exe" windows/AudioTranscriptionSummary/AudioTranscriptionSummary.csproj /p:Configuration=Release /p:Platform=x64 /restore
+```
+
+> **注意**: `dotnet build` は WinUI 3 の PRI タスク DLL が見つからないため使用できません。VS Community MSBuild を使用してください。
+
+## テスト
+
+```powershell
+# テストプロジェクトのビルド（MSBuild）
+& "C:\Program Files\Microsoft Visual Studio\2022\Community\MSBuild\Current\Bin\MSBuild.exe" test/windows/AudioTranscriptionSummary.Tests/AudioTranscriptionSummary.Tests.csproj /p:Configuration=Release /p:Platform=x64 /restore
+
+# テスト実行
+dotnet test test/windows/AudioTranscriptionSummary.Tests/AudioTranscriptionSummary.Tests.csproj --no-build --configuration Release -p:Platform=x64
+```
+
+テスト内容:
+- ErrorLogger テスト（5件）: エラーログ出力、ファイル名ベース/app.error.log、追記、テストデータ存在確認
+- AdditionalPromptPersistence テスト（3件）: 追加プロンプトの保存・復元、空文字、他設定への副作用なし
+
+## インストーラー
+
+```powershell
+# Inno Setup 6 が必要
+cd windows/installer
+.\build-installer.ps1
+# 出力: windows/installer/output/AudioTranscriptionSummary_Setup_1.0.0.exe
 ```

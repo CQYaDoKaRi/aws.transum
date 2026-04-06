@@ -46,3 +46,9 @@
 |----|---------|------|
 | macOS | `bash macos/installer/build-app.sh` | `macos/installer/output/AudioTranscriptionSummary_1.0.0.dmg` |
 | Windows | `powershell windows/installer/build-installer.ps1` | `windows/installer/output/AudioTranscriptionSummary_Setup_1.0.0.exe` |
+
+## テスト
+
+| OS | ビルド | 実行 |
+|----|--------|------|
+| Windows | `MSBuild test/windows/AudioTranscriptionSummary.Tests/AudioTranscriptionSummary.Tests.csproj /p:Configuration=Release /p:Platform=x64 /restore` | `dotnet test test/windows/AudioTranscriptionSummary.Tests/ --no-build -c Release -p:Platform=x64` |

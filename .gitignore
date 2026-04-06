@@ -14,5 +14,9 @@ windows/AudioTranscriptionSummary/bin/
 windows/AudioTranscriptionSummary/obj/
 windows/installer/output/
 
+# Test build output
+test/windows/AudioTranscriptionSummary.Tests/bin/
+test/windows/AudioTranscriptionSummary.Tests/obj/
+
 # テストデータ（音声ファイル・文字起こしテキスト等）
 test/data/

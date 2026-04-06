@@ -69,9 +69,7 @@ struct TranscriptView: View {
             } else if !isProcessing {
                 ContentUnavailableView {
                     Label("文字起こし結果", systemImage: "text.alignleft")
-                } description: {
-                    Text("音声を読み込んで「文字起こし＋要約」を実行してください")
-                }
+                } description: { EmptyView() }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
 

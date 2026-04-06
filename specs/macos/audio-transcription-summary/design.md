@@ -514,6 +514,10 @@ stateDiagram-v2
 
 **実装方式（Windows）**: MainPage.xaml の各 Expander に `x:Name` を付与し、コードビハインドで `IsExpanded` プロパティを直接制御する。
 
+### 翻訳パネルリセット連動
+
+文字起こし結果（Transcript）または要約結果（Summary）がクリア・更新された際に、対応する翻訳パネルの翻訳結果を自動リセットする。MainView の `.onChange(of: viewModel.transcript)` と `.onChange(of: viewModel.summary)` で各 TranslationViewModel の `reset()` を呼び出す。
+
 ### エラー処理方針
 
 本アプリケーションでは、すべてのエラーを `AppError` 列挙型で統一的に管理する。各サービスは Swift の `throws` メカニズムを用いてエラーを伝播し、ViewModel がエラーをキャッチしてユーザー向けメッセージに変換する。

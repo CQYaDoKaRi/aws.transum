@@ -543,6 +543,18 @@ stateDiagram-v2
 
 AudioTranscriptionSummaryApp の init() で NSImage をプログラム生成し、NSApplication.shared.applicationIconImage に設定する。デザインは青グラデーション背景（深い青→明るい青）に白い波形バー（音声キャプチャ）、右下にドキュメントアイコン（文字起こし・要約）、左下に「T」文字（Transcription）を配置する。
 
+## インストーラー
+
+`macos/installer/build-app.sh` スクリプトで .app バンドルと DMG インストーラーを作成する。
+
+**処理フロー**:
+1. `swift build -c release` でリリースビルド
+2. .app バンドル構造（Contents/MacOS, Contents/Resources, Info.plist）を作成
+3. Python スクリプトで各サイズのアイコン PNG を生成し、`iconutil` で .icns に変換
+4. `hdiutil` で DMG を作成（.app + Applications シンボリックリンク）
+
+**出力**: `macos/installer/output/AudioTranscriptionSummary_1.0.0.dmg`
+
 ## テスト戦略（Testing Strategy）
 
 ### テスト方針

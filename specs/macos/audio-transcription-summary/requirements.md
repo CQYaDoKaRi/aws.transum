@@ -178,3 +178,15 @@
 1. THE App SHALL 起動時にアプリアイコンを Dock に表示する
 2. THE App SHALL 青いグラデーション背景に白い波形バー（音声）、ドキュメントアイコン（文字起こし・要約）、「T」文字（Transcription）を組み合わせたデザインのアイコンを使用する
 3. THE App SHALL プログラムで NSImage を生成し NSApplication.applicationIconImage に設定する
+
+### 要件 13: インストーラー（Installer）
+
+**ユーザーストーリー:** ユーザーとして、DMGファイルからアプリケーションを簡単にインストールしたい。それにより、Applicationsフォルダにドラッグ＆ドロップするだけで利用開始できるようにしたい。
+
+#### 受け入れ基準（Acceptance Criteria）
+
+1. THE App SHALL .app バンドル形式でパッケージングされる
+2. THE App SHALL DMG インストーラーとして配布される
+3. THE DMG SHALL .app と Applications フォルダへのシンボリックリンクを含む
+4. THE App SHALL Info.plist にマイク、音声認識、画面収録の使用説明を含む
+5. THE App SHALL ビルドスクリプト（build-app.sh）で再現可能にパッケージを作成できる

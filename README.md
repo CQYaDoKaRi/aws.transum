@@ -39,3 +39,10 @@
 - [macOS 版](macos/README.md)
 - [Windows 版](windows/README.md)
 - [共通 UI レイアウト設計書](docs/ui-layout-spec.md)
+
+## インストーラー
+
+| OS | コマンド | 出力 |
+|----|---------|------|
+| macOS | `bash macos/installer/build-app.sh` | `macos/installer/output/AudioTranscriptionSummary_1.0.0.dmg` |
+| Windows | `powershell windows/installer/build-installer.ps1` | `windows/installer/output/AudioTranscriptionSummary_Setup_1.0.0.exe` |

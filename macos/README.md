@@ -43,6 +43,19 @@ swift build
 swift run AudioTranscriptionSummary
 ```
 
+## インストーラー作成
+
+```bash
+cd macos
+bash installer/build-app.sh
+```
+
+出力:
+- `macos/installer/output/AudioTranscriptionSummary.app` — .app バンドル
+- `macos/installer/output/AudioTranscriptionSummary_1.0.0.dmg` — DMG インストーラー
+
+インストール: DMG を開いて .app を Applications フォルダにドラッグ
+
 ## テスト
 
 ```bash

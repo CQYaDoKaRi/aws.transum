@@ -5,3 +5,11 @@ xcuserdata/
 DerivedData/
 .DS_Store
 Package.resolved
+
+# macOS installer output
+macos/installer/output/
+
+# Windows build output
+windows/AudioTranscriptionSummary/bin/
+windows/AudioTranscriptionSummary/obj/
+windows/installer/output/

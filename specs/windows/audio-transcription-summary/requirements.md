@@ -174,3 +174,14 @@
 2. THE App SHALL すべてのテキストエリアにBorderフレーム（BorderThickness=1, CornerRadius=4）を適用する
 3. THE App SHALL コピーボタンにFontIcon &#xE8C8; アイコンを使用する
 4. THE App SHALL 翻訳ボタンにFontIcon &#xE8C3; アイコンを使用する
+
+### 要件 13: アプリアイコン（Application Icon）
+
+**ユーザーストーリー:** ユーザーとして、タスクバーやウィンドウタイトルでアプリを視覚的に識別したい。それにより、他のアプリケーションと区別しやすくしたい。
+
+#### 受け入れ基準（Acceptance Criteria）
+
+1. THE App SHALL 起動時にアプリアイコンをウィンドウタイトルバーとタスクバーに表示する
+2. THE App SHALL 青いグラデーション背景に白い波形バー（音声）、ドキュメントアイコン（文字起こし・要約）、「T」文字（Transcription）を組み合わせたデザインのアイコンを使用する
+3. THE App SHALL System.Drawing.Common でICOファイルを生成し AppWindow.SetIcon で設定する
+4. THE App SHALL 生成したICOファイルを %APPDATA%\AudioTranscriptionSummary\app.ico にキャッシュする

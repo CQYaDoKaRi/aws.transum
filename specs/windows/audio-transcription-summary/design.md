@@ -348,6 +348,10 @@ stateDiagram-v2
 - プロパティベーステスト: FsCheck
 - AWS依存はインターフェース抽象化でモック化
 
+## アプリアイコン
+
+AppIconGenerator サービスが System.Drawing.Common を使用してプログラムでアイコンを生成する。macOS版と同じデザイン（青グラデーション背景 + 白い波形バー + ドキュメントアイコン + 「T」文字）をICOファイルとして出力し、%APPDATA%\AudioTranscriptionSummary\app.ico にキャッシュする。MainWindow の初期化時に AppWindow.SetIcon() でタイトルバーとタスクバーに設定する。
+
 ## インストーラー
 
 Inno Setup 6 を使用したWindowsインストーラーを提供する。

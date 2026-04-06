@@ -539,6 +539,10 @@ stateDiagram-v2
 
 エラーメッセージは SwiftUI の `.alert` モディファイアを用いてモーダルダイアログとして表示する。再試行可能なエラーの場合は「再試行」と「閉じる」の2つのアクションを提供する。
 
+## アプリアイコン
+
+AudioTranscriptionSummaryApp の init() で NSImage をプログラム生成し、NSApplication.shared.applicationIconImage に設定する。デザインは青グラデーション背景（深い青→明るい青）に白い波形バー（音声キャプチャ）、右下にドキュメントアイコン（文字起こし・要約）、左下に「T」文字（Transcription）を配置する。
+
 ## テスト戦略（Testing Strategy）
 
 ### テスト方針

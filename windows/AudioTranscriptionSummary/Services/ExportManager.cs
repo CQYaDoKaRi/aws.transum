@@ -26,7 +26,7 @@ public class ExportManager
         }
     }
 
-    public void Export(Transcript transcript, Summary? summary, string directory)
+    public void Export(Transcript transcript, Summary? summary, string directory, string? sourceFileName = null)
     {
         if (!CanWrite(directory))
         {
@@ -35,7 +35,11 @@ public class ExportManager
                 "保存先に書き込み権限がありません");
         }
 
-        var baseName = DateTime.Now.ToString("yyyyMMdd_HHmmss");
+        // 音声ファイル名ベース（拡張子なし）
+        var baseName = sourceFileName ?? DateTime.Now.ToString("yyyyMMdd_HHmmss");
+        var ext = Path.GetExtension(baseName);
+        if (!string.IsNullOrEmpty(ext))
+            baseName = Path.GetFileNameWithoutExtension(baseName);
 
         // Export transcript
         var transcriptPath = Path.Combine(directory, $"{baseName}.transcript.txt");

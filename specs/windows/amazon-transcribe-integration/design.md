@@ -66,7 +66,7 @@ public class TranscribeClient
 
 ```csharp
 // ContentDialogベースの設定画面（MinWidth=750）
-// グループラベル: 青色バッジ（🔑 AWS認証情報、📁 フォルダ設定、🎙️ リアルタイム設定）
+// グループラベル: 青色バッジ（🔑 AWS認証情報、📁 フォルダ設定、🎙️ リアルタイム設定、🔍 要約（Bedrock））
 // - TextBox: Access Key ID
 // - PasswordBox: Secret Access Key
 // - ComboBox: リージョン（12リージョン）
@@ -74,6 +74,7 @@ public class TranscribeClient
 // - FolderPicker: 録音保存先、エクスポート保存先（「📁 フォルダを選択...」ボタンを別行に配置）
 // - ToggleSwitch: リアルタイム文字起こし、言語自動判別
 // - ComboBox: デフォルト翻訳先言語
+// - 🔍 要約（Bedrock）グループ: ComboBox で基盤モデル選択（リージョン変更時に自動更新）
 // - Button: 保存、接続テスト、削除
 // - 接続ステータスバッジ（灰/黄/緑/赤）
 ```
@@ -108,6 +109,27 @@ public async Task<bool> TestConnectionAsync()
 | S3アクセス拒否 | TranscriptionFailed | IAMポリシーを確認してください |
 | ジョブ失敗 | TranscriptionFailed | ジョブ失敗理由を含む |
 | 無音 | SilentAudio | 音声が検出されませんでした |
+
+## Summarizer（Bedrock要約）
+
+```csharp
+public class Summarizer
+{
+    public async Task<Summary> SummarizeAsync(Transcript transcript, string additionalPrompt = "")
+    {
+        // Cross-Region inference profile IDを使用（on-demand throughput対応）
+        var model = BedrockModel.Find(modelId);
+        var inferenceId = model?.GetInferenceId(settings.Region) ?? modelId;
+        // ConverseRequest.ModelId = inferenceId
+    }
+}
+```
+
+Bedrock要約失敗時はErrorLoggerにログを記録し、ローカル抽出型要約にフォールバックする。
+
+## ErrorLogger統合
+
+TranscribeClient、Summarizer、MainViewModelの各エラーハンドリング箇所でErrorLogger.SaveErrorLogを呼び出し、詳細なエラー情報をファイルに記録する。
 
 ## テスト戦略
 

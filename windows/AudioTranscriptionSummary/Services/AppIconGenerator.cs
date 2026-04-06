@@ -40,7 +40,7 @@ public static class AppIconGenerator
         using var bmp = new Bitmap(size, size);
         using var g = Graphics.FromImage(bmp);
         g.SmoothingMode = SmoothingMode.HighQuality;
-        g.TextRenderingHint = TextRenderingHint.AntiAliasAlias;
+        g.TextRenderingHint = TextRenderingHint.AntiAlias;
         g.InterpolationMode = InterpolationMode.HighQualityBicubic;
 
         // 角丸背景（青グラデーション）

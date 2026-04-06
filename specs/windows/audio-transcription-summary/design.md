@@ -41,6 +41,7 @@ graph TB
         ExportManager[ExportManager]
         SettingsStore[SettingsStore]
         StatusMonitor[StatusMonitor]
+        ErrorLogger[ErrorLogger]
     end
 
     subgraph Model Layer
@@ -69,6 +70,26 @@ graph TB
 ```
 
 ## コンポーネントとインターフェース
+
+### TranscriptionLanguage
+
+```csharp
+// Models/TranscriptionLanguage.cs
+public enum TranscriptionLanguage
+{
+    Auto, Japanese, English, Chinese, Korean, French, German, Spanish,
+    Portuguese, Italian, Hindi, Arabic, Russian, Turkish, Dutch, Swedish,
+    Polish, Thai, Indonesian, Vietnamese, Malay
+}
+
+public static class TranscriptionLanguageExtensions
+{
+    public static string ToCode(this TranscriptionLanguage lang);      // "auto", "ja-JP", "en-US", etc.
+    public static string ToDisplayName(this TranscriptionLanguage lang); // "自動判別", "日本語", "英語", etc.
+}
+```
+
+21言語＋自動判別（Auto）。バッチ文字起こし・リアルタイム文字起こしの両方で使用。Auto選択時はTranscribe APIで`IdentifyLanguage=true`を使用。
 
 ### SettingsStore
 
@@ -102,7 +123,7 @@ public class AudioCaptureService : IDisposable
 }
 ```
 
-録音ファイルの保存先はSettingsStoreのRecordingDirectoryPathを使用する。
+録音ファイルの保存先はSettingsStoreのRecordingDirectoryPathを使用する。ファイル名は `yyyyMMdd_HHmmss.wav`（プレフィックスなし）。
 
 public class AudioSourceInfo
 {
@@ -150,30 +171,44 @@ public class Summarizer
 {
     public const int MinimumCharacterCount = 50;
 
-    public Summary Summarize(Transcript transcript);
+    public Summarizer(SettingsStore settingsStore);
+    public async Task<Summary> SummarizeAsync(Transcript transcript, string additionalPrompt = "");
 }
 ```
 
 処理フロー:
-1. 文分割（。！？.!? で分割）
-2. 単語頻度スコアリング（最大値で正規化）
-3. 位置スコアリング（先頭1.0、末尾0.5、中間漸減）
-4. 長さスコアリング
-5. 上位約30%（最低1文）を選択、元の順序を保持
+1. AWS認証情報が設定されている場合、Amazon Bedrock（Claude）で生成型要約を試みる
+2. Bedrock要約失敗時はErrorLoggerにログを記録し、ローカル抽出型要約にフォールバック
+3. ローカル抽出型要約: 文分割→単語頻度スコアリング→位置スコアリング→長さスコアリング→上位約30%選択
+
+### ErrorLogger
+
+```csharp
+// Services/ErrorLogger.cs
+public static class ErrorLogger
+{
+    public static void SaveErrorLog(Exception error, string operation, Dictionary<string, string>? context = null);
+}
+```
+
+Mac互換のエラーログサービス。ログファイルは `yyyyMMdd_HHmmss.error.log` 形式で、エクスポート先または録音先ディレクトリに保存。
+ログ内容: エラー概要、AppError詳細、InnerExceptionチェーン（最大5階層）、スタックトレース（最大30行）、コンテキスト情報、システム情報（OS、.NET、PID、メモリ、CPU数）。
+ログ書き込み自体の失敗は無視する。
 
 ### ExportManager
 
 ```csharp
 public class ExportManager
 {
-    public void Export(Transcript transcript, Summary? summary, string directory);
+    public void Export(Transcript transcript, Summary? summary, string directory, string? sourceFileName = null);
     public bool CanWrite(string directory);
 }
 ```
 
 ファイル形式:
-- `{baseName}.transcript.txt`: "=== Transcript ===" + テキスト
-- `{baseName}.summary.txt`: "=== Summary ===" + テキスト
+- `{baseName}.transcript.txt`: "=== Transcript ===" + テキスト（baseNameは音声ファイル名から拡張子を除去）
+- `{baseName}.summary.txt`: "=== Summary ===" + テキスト（上書き保存）
+- sourceFileName未指定時は `yyyyMMdd_HHmmss` をbaseNameとして使用
 - UTF-8エンコーディング
 
 ### StatusMonitor
@@ -204,15 +239,20 @@ public partial class MainViewModel : ObservableObject
     [ObservableProperty] private double _transcriptionProgress;
     [ObservableProperty] private bool _isCapturing;
     [ObservableProperty] private bool _isSummarizing;
+    [ObservableProperty] private bool _isTranscribing;
     [ObservableProperty] private float _audioLevel;
     [ObservableProperty] private string? _errorMessage;
+    [ObservableProperty] private string _summaryAdditionalPrompt = "";
     [ObservableProperty] private bool _isPlaying;
     [ObservableProperty] private TimeSpan _playbackPosition;
     [ObservableProperty] private List<AudioSourceInfo> _audioSources;
     [ObservableProperty] private AudioSourceInfo? _selectedSource;
+    [ObservableProperty] private TranscriptionLanguage _selectedTranscriptionLanguage = TranscriptionLanguage.Auto;
 
-    [RelayCommand] private async Task ImportFileAsync();
+    [RelayCommand] private async Task ImportFileAsync(string filePath);
     [RelayCommand] private async Task TranscribeAndSummarizeAsync();
+    [RelayCommand] private async Task ResummarizeAsync();
+    [RelayCommand] private async Task SummarizeFromFileAsync(string filePath);
     [RelayCommand] private async Task ExportAsync();
     [RelayCommand] private async Task StartCaptureAsync();
     [RelayCommand] private void StopCapture();
@@ -227,6 +267,17 @@ public partial class MainViewModel : ObservableObject
     public TranslationViewModel SummaryTranslationVM { get; }
 }
 ```
+
+テキストクリア動作:
+- 文字起こし開始時: Transcript=null, Summary=null, TranscriptTranslationVM.Reset(), SummaryTranslationVM.Reset()
+- Transcript設定/クリア時: TranscriptTranslationText をクリア
+- 要約開始時: Summary=null, SummaryTranslationVM.Reset()
+- 録音開始時: 全テキストクリア（RealtimeTranscriptionVM, 全TranslationVM, Transcript, Summary, AudioFile）
+
+要約フロー:
+- 「要約」ボタン: Transcriptがあればそれを使用、なければリアルタイムテキストからTranscript生成、Bedrockで要約
+- 「ファイルから要約」: ファイル読み込み→Transcript生成→Bedrock要約
+- 要約結果は `{baseName}.summary.txt` に上書き保存
 
 ## データモデル（Data Models）
 
@@ -244,6 +295,7 @@ public class AppSettings
     public bool IsRealtimeEnabled { get; set; } = true;
     public bool IsAutoDetectEnabled { get; set; } = true;
     public string DefaultTargetLanguage { get; set; } = "ja";
+    public string BedrockModelId { get; set; } = "anthropic.claude-sonnet-4-6";
 }
 ```
 
@@ -347,6 +399,25 @@ stateDiagram-v2
 - ユニットテスト: xUnit + Moq
 - プロパティベーステスト: FsCheck
 - AWS依存はインターフェース抽象化でモック化
+
+## テキストエリアリサイズ
+
+MainPage.xamlのSizeChangedハンドラでウィンドウリサイズ時にテキストエリアの高さを動的に調整する。
+
+```csharp
+private const double MinTextAreaHeight = 150;
+
+private void OnPageSizeChanged(object sender, SizeChangedEventArgs e)
+{
+    var availableHeight = e.NewSize.Height;
+    var overhead = 468; // CommandBar + StatusBar + Expander headers + buttons/padding
+    var textAreaCount = 3; // リアルタイム、文字起こし、要約
+    var calculatedHeight = Math.Max(MinTextAreaHeight, (availableHeight - overhead) / textAreaCount);
+    // 各テキストエリアのHeightを calculatedHeight に設定
+}
+```
+
+すべてのテキストエリア（リアルタイム、文字起こし、要約、各翻訳）の初期高さは150px。最小高さ150px。
 
 ## アプリアイコン
 

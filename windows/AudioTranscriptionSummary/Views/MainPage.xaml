@@ -1,4 +1,4 @@
-<Page
+﻿<Page
     x:Class="AudioTranscriptionSummary.Views.MainPage"
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
@@ -57,10 +57,10 @@
                                     <TextBlock x:Name="LanguageBadgeText" FontSize="11" Foreground="White" />
                                 </Border>
                                 <TextBlock x:Name="RealtimeErrorText" FontSize="11" Foreground="Red" VerticalAlignment="Center" />
-                                <Button Click="OnCopyRealtime"><StackPanel Orientation="Horizontal" Spacing="4"><FontIcon Glyph="&#xE8C8;" FontSize="12" /><TextBlock Text="コピー" /></StackPanel></Button>
+                                <Button x:Name="CopyRealtimeBtn" IsEnabled="False" Click="OnCopyRealtime"><StackPanel Orientation="Horizontal" Spacing="4"><FontIcon Glyph="&#xE8C8;" FontSize="12" /><TextBlock Text="コピー" /></StackPanel></Button>
                             </StackPanel>
-                            <Border BorderBrush="{ThemeResource SystemControlForegroundBaseMediumBrush}" BorderThickness="1" CornerRadius="4" Margin="4" MinHeight="80">
-                                <ScrollViewer x:Name="RealtimeScrollViewer" MaxHeight="200" VerticalScrollBarVisibility="Auto">
+                            <Border BorderBrush="{ThemeResource SystemControlForegroundBaseMediumBrush}" BorderThickness="1" CornerRadius="4" Margin="4" Height="150">
+                                <ScrollViewer x:Name="RealtimeScrollViewer" VerticalScrollBarVisibility="Auto">
                                     <RichTextBlock x:Name="RealtimeRichText" TextWrapping="Wrap" IsTextSelectionEnabled="True" Padding="8">
                                         <Paragraph><Run x:Name="RealtimeFinalRun" /><Run x:Name="RealtimePartialRun" Foreground="Gray" /></Paragraph>
                                     </RichTextBlock>
@@ -71,13 +71,13 @@
                             <StackPanel Orientation="Horizontal" Spacing="4" Padding="4">
                                 <ComboBox x:Name="RealtimeTranslateLang" Width="120" />
                                 <ProgressRing x:Name="RealtimeTranslateProgress" IsActive="False" Width="16" Height="16" />
-                                <Button Click="OnCopyRealtimeTranslation"><StackPanel Orientation="Horizontal" Spacing="4"><FontIcon Glyph="&#xE8C8;" FontSize="12" /><TextBlock Text="コピー" /></StackPanel></Button>
+                                <Button x:Name="CopyRealtimeTransBtn" IsEnabled="False" Click="OnCopyRealtimeTranslation"><StackPanel Orientation="Horizontal" Spacing="4"><FontIcon Glyph="&#xE8C8;" FontSize="12" /><TextBlock Text="コピー" /></StackPanel></Button>
                             </StackPanel>
-                            <Border BorderBrush="{ThemeResource SystemControlForegroundBaseMediumBrush}" BorderThickness="1" CornerRadius="4" Margin="4" MinHeight="80">
-                                <ScrollViewer MaxHeight="200" VerticalScrollBarVisibility="Auto">
-                                    <TextBlock x:Name="RealtimeTranslationText" TextWrapping="Wrap" IsTextSelectionEnabled="True" Padding="8" />
-                                </ScrollViewer>
-                            </Border>
+                            <TextBox x:Name="RealtimeTranslationText" TextWrapping="Wrap" IsReadOnly="True"
+                                     AcceptsReturn="True" Height="150"
+                                     ScrollViewer.VerticalScrollBarVisibility="Auto"
+                                     BorderBrush="{ThemeResource SystemControlForegroundBaseMediumBrush}"
+                                     BorderThickness="1" CornerRadius="4" Margin="4" Padding="8" />
                         </StackPanel>
                     </Grid>
                 </Expander>
@@ -112,27 +112,28 @@
                             <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
                             <StackPanel Grid.Column="0" Margin="0,0,4,0">
                                 <StackPanel Orientation="Horizontal" Spacing="4" Padding="4">
-                                    <Button Click="OnTranscribeClick"><StackPanel Orientation="Horizontal" Spacing="4"><FontIcon Glyph="&#xE8C1;" FontSize="14" /><TextBlock Text="文字起こし＋要約" /></StackPanel></Button>
-                                    <Button Click="OnCopyTranscript"><StackPanel Orientation="Horizontal" Spacing="4"><FontIcon Glyph="&#xE8C8;" FontSize="12" /><TextBlock Text="コピー" /></StackPanel></Button>
+                                    <ComboBox x:Name="TranscriptionLangCombo" Width="120" />
+                                    <Button x:Name="TranscribeButton" Click="OnTranscribeClick"><StackPanel Orientation="Horizontal" Spacing="4"><FontIcon Glyph="&#xE8C1;" FontSize="14" /><TextBlock Text="文字起こし＋要約" /></StackPanel></Button>
+                                    <Button x:Name="CopyTranscriptBtn" IsEnabled="False" Click="OnCopyTranscript"><StackPanel Orientation="Horizontal" Spacing="4"><FontIcon Glyph="&#xE8C8;" FontSize="12" /><TextBlock Text="コピー" /></StackPanel></Button>
                                 </StackPanel>
-                                <Border BorderBrush="{ThemeResource SystemControlForegroundBaseMediumBrush}" BorderThickness="1" CornerRadius="4" Margin="4" MinHeight="80">
-                                    <ScrollViewer MaxHeight="300" VerticalScrollBarVisibility="Auto">
-                                        <TextBlock x:Name="TranscriptText" TextWrapping="Wrap" IsTextSelectionEnabled="True" Padding="8" />
-                                    </ScrollViewer>
-                                </Border>
+                                <TextBox x:Name="TranscriptText" TextWrapping="Wrap" IsReadOnly="True"
+                                         AcceptsReturn="True" Height="150"
+                                         ScrollViewer.VerticalScrollBarVisibility="Auto"
+                                         BorderBrush="{ThemeResource SystemControlForegroundBaseMediumBrush}"
+                                         BorderThickness="1" CornerRadius="4" Margin="4" Padding="8" />
                             </StackPanel>
                             <StackPanel Grid.Column="1" Margin="4,0,0,0">
                                 <StackPanel Orientation="Horizontal" Spacing="4" Padding="4">
                                     <ComboBox x:Name="TranscriptTranslateLang" Width="120" />
-                                    <Button Click="OnTranslateTranscript"><StackPanel Orientation="Horizontal" Spacing="4"><FontIcon Glyph="&#xE8C3;" FontSize="12" /><TextBlock Text="翻訳" /></StackPanel></Button>
+                                    <Button x:Name="TranslateTranscriptBtn" IsEnabled="False" Click="OnTranslateTranscript"><StackPanel Orientation="Horizontal" Spacing="4"><FontIcon Glyph="&#xE8C3;" FontSize="12" /><TextBlock Text="翻訳" /></StackPanel></Button>
                                     <ProgressRing x:Name="TranscriptTranslateProgress" IsActive="False" Width="16" Height="16" />
-                                    <Button Click="OnCopyTranscriptTranslation"><StackPanel Orientation="Horizontal" Spacing="4"><FontIcon Glyph="&#xE8C8;" FontSize="12" /><TextBlock Text="コピー" /></StackPanel></Button>
+                                    <Button x:Name="CopyTranscriptTransBtn" IsEnabled="False" Click="OnCopyTranscriptTranslation"><StackPanel Orientation="Horizontal" Spacing="4"><FontIcon Glyph="&#xE8C8;" FontSize="12" /><TextBlock Text="コピー" /></StackPanel></Button>
                                 </StackPanel>
-                                <Border BorderBrush="{ThemeResource SystemControlForegroundBaseMediumBrush}" BorderThickness="1" CornerRadius="4" Margin="4" MinHeight="80">
-                                    <ScrollViewer MaxHeight="300" VerticalScrollBarVisibility="Auto">
-                                        <TextBlock x:Name="TranscriptTranslationText" TextWrapping="Wrap" IsTextSelectionEnabled="True" Padding="8" />
-                                    </ScrollViewer>
-                                </Border>
+                                <TextBox x:Name="TranscriptTranslationText" TextWrapping="Wrap" IsReadOnly="True"
+                                         AcceptsReturn="True" Height="150"
+                                         ScrollViewer.VerticalScrollBarVisibility="Auto"
+                                         BorderBrush="{ThemeResource SystemControlForegroundBaseMediumBrush}"
+                                         BorderThickness="1" CornerRadius="4" Margin="4" Padding="8" />
                             </StackPanel>
                         </Grid>
                     </StackPanel>
@@ -155,48 +156,49 @@
                             <TextBlock x:Name="BedrockModelLabel" Text="ローカル要約" FontSize="11" Foreground="Gray" />
                         </StackPanel>
                         <Grid Margin="4,0,4,4">
-                            <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="110" /></Grid.ColumnDefinitions>
+                            <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="140" /></Grid.ColumnDefinitions>
                             <TextBox x:Name="SummaryPromptBox" Grid.Column="0" PlaceholderText="追加プロンプト（例: 箇条書きで要約して）"
                                      AcceptsReturn="True" TextWrapping="Wrap" MinHeight="40" MaxHeight="80" />
                             <StackPanel Grid.Column="1" Spacing="4" Margin="4,0,0,0">
-                                <Button Click="OnSummaryFileClick" HorizontalAlignment="Stretch">
+                                <Button x:Name="SummaryFileBtn" Click="OnSummaryFileClick" HorizontalAlignment="Stretch">
                                     <StackPanel Orientation="Horizontal" Spacing="4" HorizontalAlignment="Center">
                                         <FontIcon Glyph="&#xE8E5;" FontSize="12" />
-                                        <TextBlock Text="ファイルから" />
+                                        <TextBlock Text="ファイルから要約" />
                                     </StackPanel>
                                 </Button>
-                                <Button Click="OnResummarizeClick" HorizontalAlignment="Stretch">
+                                <Button x:Name="ResummarizeBtn" Click="OnResummarizeClick" HorizontalAlignment="Stretch">
                                     <StackPanel Orientation="Horizontal" Spacing="4" HorizontalAlignment="Center">
                                         <FontIcon Glyph="&#xE8A5;" FontSize="12" />
                                         <TextBlock Text="要約" />
                                     </StackPanel>
                                 </Button>
+                                <ProgressRing x:Name="SummarizeProgress" IsActive="False" Width="20" Height="20" />
                             </StackPanel>
                         </Grid>
                         <Grid>
                             <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
                             <StackPanel Grid.Column="0" Margin="0,0,4,0">
                                 <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Padding="4">
-                                    <Button Click="OnCopySummary"><StackPanel Orientation="Horizontal" Spacing="4"><FontIcon Glyph="&#xE8C8;" FontSize="12" /><TextBlock Text="コピー" /></StackPanel></Button>
+                                    <Button x:Name="CopySummaryBtn" IsEnabled="False" Click="OnCopySummary"><StackPanel Orientation="Horizontal" Spacing="4"><FontIcon Glyph="&#xE8C8;" FontSize="12" /><TextBlock Text="コピー" /></StackPanel></Button>
                                 </StackPanel>
-                                <Border BorderBrush="{ThemeResource SystemControlForegroundBaseMediumBrush}" BorderThickness="1" CornerRadius="4" Margin="4" MinHeight="60">
-                                    <ScrollViewer MaxHeight="200" VerticalScrollBarVisibility="Auto">
-                                        <TextBlock x:Name="SummaryText" TextWrapping="Wrap" IsTextSelectionEnabled="True" Padding="8" />
-                                    </ScrollViewer>
-                                </Border>
+                                <TextBox x:Name="SummaryText" TextWrapping="Wrap" IsReadOnly="True"
+                                         AcceptsReturn="True" Height="150"
+                                         ScrollViewer.VerticalScrollBarVisibility="Auto"
+                                         BorderBrush="{ThemeResource SystemControlForegroundBaseMediumBrush}"
+                                         BorderThickness="1" CornerRadius="4" Margin="4" Padding="8" />
                             </StackPanel>
                             <StackPanel Grid.Column="1" Margin="4,0,0,0">
                                 <StackPanel Orientation="Horizontal" Spacing="4" Padding="4">
                                     <ComboBox x:Name="SummaryTranslateLang" Width="120" />
-                                    <Button Click="OnTranslateSummary"><StackPanel Orientation="Horizontal" Spacing="4"><FontIcon Glyph="&#xE8C3;" FontSize="12" /><TextBlock Text="翻訳" /></StackPanel></Button>
+                                    <Button x:Name="TranslateSummaryBtn" IsEnabled="False" Click="OnTranslateSummary"><StackPanel Orientation="Horizontal" Spacing="4"><FontIcon Glyph="&#xE8C3;" FontSize="12" /><TextBlock Text="翻訳" /></StackPanel></Button>
                                     <ProgressRing x:Name="SummaryTranslateProgress" IsActive="False" Width="16" Height="16" />
-                                    <Button Click="OnCopySummaryTranslation"><StackPanel Orientation="Horizontal" Spacing="4"><FontIcon Glyph="&#xE8C8;" FontSize="12" /><TextBlock Text="コピー" /></StackPanel></Button>
+                                    <Button x:Name="CopySummaryTransBtn" IsEnabled="False" Click="OnCopySummaryTranslation"><StackPanel Orientation="Horizontal" Spacing="4"><FontIcon Glyph="&#xE8C8;" FontSize="12" /><TextBlock Text="コピー" /></StackPanel></Button>
                                 </StackPanel>
-                                <Border BorderBrush="{ThemeResource SystemControlForegroundBaseMediumBrush}" BorderThickness="1" CornerRadius="4" Margin="4" MinHeight="60">
-                                    <ScrollViewer MaxHeight="200" VerticalScrollBarVisibility="Auto">
-                                        <TextBlock x:Name="SummaryTranslationText" TextWrapping="Wrap" IsTextSelectionEnabled="True" Padding="8" />
-                                    </ScrollViewer>
-                                </Border>
+                                <TextBox x:Name="SummaryTranslationText" TextWrapping="Wrap" IsReadOnly="True"
+                                         AcceptsReturn="True" Height="150"
+                                         ScrollViewer.VerticalScrollBarVisibility="Auto"
+                                         BorderBrush="{ThemeResource SystemControlForegroundBaseMediumBrush}"
+                                         BorderThickness="1" CornerRadius="4" Margin="4" Padding="8" />
                             </StackPanel>
                         </Grid>
                     </StackPanel>

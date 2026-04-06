@@ -15,16 +15,68 @@ Windows 向け音声文字起こし・要約・リアルタイム翻訳アプリ
 - WASAPI によるシステム音声・マイクキャプチャ
 - 画面録画（動画＋音声）
 - Amazon Transcribe Streaming リアルタイム文字起こし（言語自動判別）
+- 文字起こし言語選択（21言語＋自動判別）
 - Amazon Translate リアルタイム翻訳（7言語）
+- リアルタイム自動翻訳（FinalTranscript受信時に全文翻訳をトリガー）
 - Amazon Bedrock（Claude 4.x / 3.x / Titan）による生成型要約
+  - Cross-Region inference profile 対応（BedrockModel.GetInferenceId）
   - 設定画面で基盤モデルを選択可能（デフォルト: Claude Sonnet 4.6）
   - 追加プロンプトで要約の指示をカスタマイズ可能（複数行入力対応）
   - 要約のみ再実行可能
+  - ファイルから直接要約可能
+- エラーログ（ErrorLogger: yyyyMMdd_HHmmss.error.log に詳細情報を記録）
 - 全テキストエリアにコピーボタン
 - 全セクション折りたたみ可能（Expander）
 - 折りたたみセクション自動開閉連動（録音開始/停止、ファイル選択に応じて自動制御）
 - カスタムアプリアイコン（波形＋ドキュメント＋Tデザイン、タイトルバー＋タスクバー表示）
 - CPU・メモリ使用状況リアルタイム表示
+
+## ファイル命名規則
+
+| ファイル種別 | 命名規則 |
+|------------|---------|
+| 録音ファイル | `yyyyMMdd_HHmmss.wav` |
+| 文字起こし | `{音声ファイル名}.transcript.txt` |
+| 要約 | `{音声ファイル名}.summary.txt` |
+| ファイルから要約 | `{読み込みファイル名}.summary.txt` |
+| エラーログ | `yyyyMMdd_HHmmss.error.log` |
+
+## プロジェクト構造
+
+```
+windows/AudioTranscriptionSummary/
+├── Models/
+│   ├── AppError.cs
+│   ├── AppSettings.cs
+│   ├── AudioFile.cs
+│   ├── AudioSourceInfo.cs
+│   ├── BedrockModel.cs
+│   ├── Summary.cs
+│   ├── Transcript.cs
+│   ├── TranscriptionLanguage.cs
+│   └── TranslationLanguage.cs
+├── Services/
+│   ├── AudioBufferConverter.cs
+│   ├── AudioCaptureService.cs
+│   ├── AudioPlayerService.cs
+│   ├── ErrorLogger.cs
+│   ├── ExportManager.cs
+│   ├── FileImporter.cs
+│   ├── RealtimeTranscribeClient.cs
+│   ├── SettingsStore.cs
+│   ├── StatusMonitor.cs
+│   ├── Summarizer.cs
+│   ├── TranscribeClient.cs
+│   └── TranslateService.cs
+├── ViewModels/
+│   ├── MainViewModel.cs
+│   ├── RealtimeTranscriptionViewModel.cs
+│   └── TranslationViewModel.cs
+├── Views/
+│   ├── MainPage.xaml
+│   └── MainPage.xaml.cs
+└── AudioTranscriptionSummary.csproj
+```
 
 ## 依存パッケージ
 

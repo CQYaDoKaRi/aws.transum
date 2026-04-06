@@ -2,6 +2,22 @@
   "version": 3,
   "targets": {
     "net8.0-windows10.0.19041": {
+      "AWSSDK.BedrockRuntime/4.0.17.1": {
+        "type": "package",
+        "dependencies": {
+          "AWSSDK.Core": "[4.0.3.27, 5.0.0)"
+        },
+        "compile": {
+          "lib/net8.0/AWSSDK.BedrockRuntime.dll": {
+            "related": ".xml"
+          }
+        },
+        "runtime": {
+          "lib/net8.0/AWSSDK.BedrockRuntime.dll": {
+            "related": ".xml"
+          }
+        }
+      },
       "AWSSDK.Core/4.0.3.27": {
         "type": "package",
         "compile": {
@@ -112,6 +128,28 @@
           "runtimes/win-x86/native/WebView2Loader.dll": {
             "assetType": "native",
             "rid": "win-x86"
+          }
+        }
+      },
+      "Microsoft.Win32.SystemEvents/8.0.0": {
+        "type": "package",
+        "compile": {
+          "lib/net8.0/Microsoft.Win32.SystemEvents.dll": {
+            "related": ".xml"
+          }
+        },
+        "runtime": {
+          "lib/net8.0/Microsoft.Win32.SystemEvents.dll": {
+            "related": ".xml"
+          }
+        },
+        "build": {
+          "buildTransitive/net6.0/_._": {}
+        },
+        "runtimeTargets": {
+          "runtimes/win/lib/net8.0/Microsoft.Win32.SystemEvents.dll": {
+            "assetType": "runtime",
+            "rid": "win"
           }
         }
       },
@@ -359,9 +397,44 @@
             "related": ".xml"
           }
         }
+      },
+      "System.Drawing.Common/8.0.25": {
+        "type": "package",
+        "dependencies": {
+          "Microsoft.Win32.SystemEvents": "8.0.0"
+        },
+        "compile": {
+          "lib/net8.0/System.Drawing.Common.dll": {
+            "related": ".pdb;.xml"
+          }
+        },
+        "runtime": {
+          "lib/net8.0/System.Drawing.Common.dll": {
+            "related": ".pdb;.xml"
+          }
+        },
+        "build": {
+          "buildTransitive/net6.0/_._": {}
+        }
       }
     },
     "net8.0-windows10.0.19041/win-arm64": {
+      "AWSSDK.BedrockRuntime/4.0.17.1": {
+        "type": "package",
+        "dependencies": {
+          "AWSSDK.Core": "[4.0.3.27, 5.0.0)"
+        },
+        "compile": {
+          "lib/net8.0/AWSSDK.BedrockRuntime.dll": {
+            "related": ".xml"
+          }
+        },
+        "runtime": {
+          "lib/net8.0/AWSSDK.BedrockRuntime.dll": {
+            "related": ".xml"
+          }
+        }
+      },
       "AWSSDK.Core/4.0.3.27": {
         "type": "package",
         "compile": {
@@ -462,6 +535,22 @@
         },
         "build": {
           "build/Microsoft.Web.WebView2.targets": {}
+        }
+      },
+      "Microsoft.Win32.SystemEvents/8.0.0": {
+        "type": "package",
+        "compile": {
+          "lib/net8.0/Microsoft.Win32.SystemEvents.dll": {
+            "related": ".xml"
+          }
+        },
+        "runtime": {
+          "runtimes/win/lib/net8.0/Microsoft.Win32.SystemEvents.dll": {
+            "related": ".xml"
+          }
+        },
+        "build": {
+          "buildTransitive/net6.0/_._": {}
         }
       },
       "Microsoft.Windows.SDK.BuildTools/10.0.26100.7705": {
@@ -697,9 +786,44 @@
             "related": ".xml"
           }
         }
+      },
+      "System.Drawing.Common/8.0.25": {
+        "type": "package",
+        "dependencies": {
+          "Microsoft.Win32.SystemEvents": "8.0.0"
+        },
+        "compile": {
+          "lib/net8.0/System.Drawing.Common.dll": {
+            "related": ".pdb;.xml"
+          }
+        },
+        "runtime": {
+          "lib/net8.0/System.Drawing.Common.dll": {
+            "related": ".pdb;.xml"
+          }
+        },
+        "build": {
+          "buildTransitive/net6.0/_._": {}
+        }
       }
     },
     "net8.0-windows10.0.19041/win-x64": {
+      "AWSSDK.BedrockRuntime/4.0.17.1": {
+        "type": "package",
+        "dependencies": {
+          "AWSSDK.Core": "[4.0.3.27, 5.0.0)"
+        },
+        "compile": {
+          "lib/net8.0/AWSSDK.BedrockRuntime.dll": {
+            "related": ".xml"
+          }
+        },
+        "runtime": {
+          "lib/net8.0/AWSSDK.BedrockRuntime.dll": {
+            "related": ".xml"
+          }
+        }
+      },
       "AWSSDK.Core/4.0.3.27": {
         "type": "package",
         "compile": {
@@ -800,6 +924,22 @@
         },
         "build": {
           "build/Microsoft.Web.WebView2.targets": {}
+        }
+      },
+      "Microsoft.Win32.SystemEvents/8.0.0": {
+        "type": "package",
+        "compile": {
+          "lib/net8.0/Microsoft.Win32.SystemEvents.dll": {
+            "related": ".xml"
+          }
+        },
+        "runtime": {
+          "runtimes/win/lib/net8.0/Microsoft.Win32.SystemEvents.dll": {
+            "related": ".xml"
+          }
+        },
+        "build": {
+          "buildTransitive/net6.0/_._": {}
         }
       },
       "Microsoft.Windows.SDK.BuildTools/10.0.26100.7705": {
@@ -1035,9 +1175,44 @@
             "related": ".xml"
           }
         }
+      },
+      "System.Drawing.Common/8.0.25": {
+        "type": "package",
+        "dependencies": {
+          "Microsoft.Win32.SystemEvents": "8.0.0"
+        },
+        "compile": {
+          "lib/net8.0/System.Drawing.Common.dll": {
+            "related": ".pdb;.xml"
+          }
+        },
+        "runtime": {
+          "lib/net8.0/System.Drawing.Common.dll": {
+            "related": ".pdb;.xml"
+          }
+        },
+        "build": {
+          "buildTransitive/net6.0/_._": {}
+        }
       }
     },
     "net8.0-windows10.0.19041/win-x86": {
+      "AWSSDK.BedrockRuntime/4.0.17.1": {
+        "type": "package",
+        "dependencies": {
+          "AWSSDK.Core": "[4.0.3.27, 5.0.0)"
+        },
+        "compile": {
+          "lib/net8.0/AWSSDK.BedrockRuntime.dll": {
+            "related": ".xml"
+          }
+        },
+        "runtime": {
+          "lib/net8.0/AWSSDK.BedrockRuntime.dll": {
+            "related": ".xml"
+          }
+        }
+      },
       "AWSSDK.Core/4.0.3.27": {
         "type": "package",
         "compile": {
@@ -1138,6 +1313,22 @@
         },
         "build": {
           "build/Microsoft.Web.WebView2.targets": {}
+        }
+      },
+      "Microsoft.Win32.SystemEvents/8.0.0": {
+        "type": "package",
+        "compile": {
+          "lib/net8.0/Microsoft.Win32.SystemEvents.dll": {
+            "related": ".xml"
+          }
+        },
+        "runtime": {
+          "runtimes/win/lib/net8.0/Microsoft.Win32.SystemEvents.dll": {
+            "related": ".xml"
+          }
+        },
+        "build": {
+          "buildTransitive/net6.0/_._": {}
         }
       },
       "Microsoft.Windows.SDK.BuildTools/10.0.26100.7705": {
@@ -1373,10 +1564,54 @@
             "related": ".xml"
           }
         }
+      },
+      "System.Drawing.Common/8.0.25": {
+        "type": "package",
+        "dependencies": {
+          "Microsoft.Win32.SystemEvents": "8.0.0"
+        },
+        "compile": {
+          "lib/net8.0/System.Drawing.Common.dll": {
+            "related": ".pdb;.xml"
+          }
+        },
+        "runtime": {
+          "lib/net8.0/System.Drawing.Common.dll": {
+            "related": ".pdb;.xml"
+          }
+        },
+        "build": {
+          "buildTransitive/net6.0/_._": {}
+        }
       }
     }
   },
   "libraries": {
+    "AWSSDK.BedrockRuntime/4.0.17.1": {
+      "sha512": "WWggfkkg3B64Eak5YrLeJupE+GcNEuJXA/MAwca0vM12pJtD1aHGUpjWkJUUWxVy0pwfAb37E32FktNtb+iy1g==",
+      "type": "package",
+      "path": "awssdk.bedrockruntime/4.0.17.1",
+      "hasTools": true,
+      "files": [
+        ".nupkg.metadata",
+        ".signature.p7s",
+        "analyzers/dotnet/cs/AWSSDK.BedrockRuntime.CodeAnalysis.dll",
+        "analyzers/dotnet/cs/SharedAnalysisCode.dll",
+        "awssdk.bedrockruntime.4.0.17.1.nupkg.sha512",
+        "awssdk.bedrockruntime.nuspec",
+        "images/AWSLogo.png",
+        "lib/net472/AWSSDK.BedrockRuntime.dll",
+        "lib/net472/AWSSDK.BedrockRuntime.xml",
+        "lib/net8.0/AWSSDK.BedrockRuntime.dll",
+        "lib/net8.0/AWSSDK.BedrockRuntime.xml",
+        "lib/netcoreapp3.1/AWSSDK.BedrockRuntime.dll",
+        "lib/netcoreapp3.1/AWSSDK.BedrockRuntime.xml",
+        "lib/netstandard2.0/AWSSDK.BedrockRuntime.dll",
+        "lib/netstandard2.0/AWSSDK.BedrockRuntime.xml",
+        "tools/install.ps1",
+        "tools/uninstall.ps1"
+      ]
+    },
     "AWSSDK.Core/4.0.3.27": {
       "sha512": "hGdpxa7GR2JrfOGI35MWlGCiqq4GlpNDJi0DDvE8lJunboziMFeTCXypvstS5eo0WYdJR9pqHykR53QsjWj7jg==",
       "type": "package",
@@ -1630,6 +1865,41 @@
         "tools/wv2winrt/wv2winrt.xml",
         "tools/wv2winrt/zh-Hans/System.CommandLine.resources.dll",
         "tools/wv2winrt/zh-Hant/System.CommandLine.resources.dll"
+      ]
+    },
+    "Microsoft.Win32.SystemEvents/8.0.0": {
+      "sha512": "9opKRyOKMCi2xJ7Bj7kxtZ1r9vbzosMvRrdEhVhDz8j8MoBGgB+WmC94yH839NPH+BclAjtQ/pyagvi/8gDLkw==",
+      "type": "package",
+      "path": "microsoft.win32.systemevents/8.0.0",
+      "files": [
+        ".nupkg.metadata",
+        ".signature.p7s",
+        "Icon.png",
+        "LICENSE.TXT",
+        "THIRD-PARTY-NOTICES.TXT",
+        "buildTransitive/net461/Microsoft.Win32.SystemEvents.targets",
+        "buildTransitive/net462/_._",
+        "buildTransitive/net6.0/_._",
+        "buildTransitive/netcoreapp2.0/Microsoft.Win32.SystemEvents.targets",
+        "lib/net462/Microsoft.Win32.SystemEvents.dll",
+        "lib/net462/Microsoft.Win32.SystemEvents.xml",
+        "lib/net6.0/Microsoft.Win32.SystemEvents.dll",
+        "lib/net6.0/Microsoft.Win32.SystemEvents.xml",
+        "lib/net7.0/Microsoft.Win32.SystemEvents.dll",
+        "lib/net7.0/Microsoft.Win32.SystemEvents.xml",
+        "lib/net8.0/Microsoft.Win32.SystemEvents.dll",
+        "lib/net8.0/Microsoft.Win32.SystemEvents.xml",
+        "lib/netstandard2.0/Microsoft.Win32.SystemEvents.dll",
+        "lib/netstandard2.0/Microsoft.Win32.SystemEvents.xml",
+        "microsoft.win32.systemevents.8.0.0.nupkg.sha512",
+        "microsoft.win32.systemevents.nuspec",
+        "runtimes/win/lib/net6.0/Microsoft.Win32.SystemEvents.dll",
+        "runtimes/win/lib/net6.0/Microsoft.Win32.SystemEvents.xml",
+        "runtimes/win/lib/net7.0/Microsoft.Win32.SystemEvents.dll",
+        "runtimes/win/lib/net7.0/Microsoft.Win32.SystemEvents.xml",
+        "runtimes/win/lib/net8.0/Microsoft.Win32.SystemEvents.dll",
+        "runtimes/win/lib/net8.0/Microsoft.Win32.SystemEvents.xml",
+        "useSharedDesignerContext.txt"
       ]
     },
     "Microsoft.Windows.SDK.BuildTools/10.0.26100.7705": {
@@ -2394,10 +2664,51 @@
         "naudio.winmm.2.3.0.nupkg.sha512",
         "naudio.winmm.nuspec"
       ]
+    },
+    "System.Drawing.Common/8.0.25": {
+      "sha512": "Am+9K9F1RaQf8+aayuglr/uIsADlUOS+3eOqGKsDsTBQbPjY0q+55HUYiktDonPMlDay3WPHuZHuAW2cQs8LPw==",
+      "type": "package",
+      "path": "system.drawing.common/8.0.25",
+      "files": [
+        ".nupkg.metadata",
+        ".signature.p7s",
+        "Icon.png",
+        "LICENSE.TXT",
+        "THIRD-PARTY-NOTICES.TXT",
+        "buildTransitive/net461/System.Drawing.Common.targets",
+        "buildTransitive/net462/_._",
+        "buildTransitive/net6.0/_._",
+        "buildTransitive/netcoreapp2.0/System.Drawing.Common.targets",
+        "lib/MonoAndroid10/_._",
+        "lib/MonoTouch10/_._",
+        "lib/net462/System.Drawing.Common.dll",
+        "lib/net462/System.Drawing.Common.pdb",
+        "lib/net462/System.Drawing.Common.xml",
+        "lib/net6.0/System.Drawing.Common.dll",
+        "lib/net6.0/System.Drawing.Common.pdb",
+        "lib/net6.0/System.Drawing.Common.xml",
+        "lib/net7.0/System.Drawing.Common.dll",
+        "lib/net7.0/System.Drawing.Common.pdb",
+        "lib/net7.0/System.Drawing.Common.xml",
+        "lib/net8.0/System.Drawing.Common.dll",
+        "lib/net8.0/System.Drawing.Common.pdb",
+        "lib/net8.0/System.Drawing.Common.xml",
+        "lib/netstandard2.0/System.Drawing.Common.dll",
+        "lib/netstandard2.0/System.Drawing.Common.pdb",
+        "lib/netstandard2.0/System.Drawing.Common.xml",
+        "lib/xamarinios10/_._",
+        "lib/xamarinmac20/_._",
+        "lib/xamarintvos10/_._",
+        "lib/xamarinwatchos10/_._",
+        "system.drawing.common.8.0.25.nupkg.sha512",
+        "system.drawing.common.nuspec",
+        "useSharedDesignerContext.txt"
+      ]
     }
   },
   "projectFileDependencyGroups": {
     "net8.0-windows10.0.19041": [
+      "AWSSDK.BedrockRuntime >= 4.*",
       "AWSSDK.S3 >= 4.*",
       "AWSSDK.TranscribeService >= 4.*",
       "AWSSDK.TranscribeStreaming >= 4.*",
@@ -2405,7 +2716,8 @@
       "CommunityToolkit.Mvvm >= 8.*",
       "Microsoft.Windows.SDK.BuildTools >= 10.0.26100.*",
       "Microsoft.WindowsAppSDK >= 1.6.*",
-      "NAudio >= 2.*"
+      "NAudio >= 2.*",
+      "System.Drawing.Common >= 8.*"
     ]
   },
   "packageFolders": {
@@ -2459,6 +2771,10 @@
       "net8.0-windows10.0.19041": {
         "targetAlias": "net8.0-windows10.0.19041.0",
         "dependencies": {
+          "AWSSDK.BedrockRuntime": {
+            "target": "Package",
+            "version": "[4.*, )"
+          },
           "AWSSDK.S3": {
             "target": "Package",
             "version": "[4.*, )"
@@ -2490,6 +2806,10 @@
           "NAudio": {
             "target": "Package",
             "version": "[2.*, )"
+          },
+          "System.Drawing.Common": {
+            "target": "Package",
+            "version": "[8.*, )"
           }
         },
         "imports": [

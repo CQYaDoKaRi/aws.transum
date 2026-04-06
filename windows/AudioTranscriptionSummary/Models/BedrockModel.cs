@@ -1,6 +1,8 @@
 // BedrockModel.cs
 // Bedrock 基盤モデルの選択肢（Cross-Region inference 対応、macOS 版と共通）
 
+using System.Linq;
+
 namespace AudioTranscriptionSummary.Models;
 
 public record BedrockModel(string Id, string Name, string Provider,

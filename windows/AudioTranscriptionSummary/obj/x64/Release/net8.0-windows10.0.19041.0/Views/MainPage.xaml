@@ -11,17 +11,17 @@
         </Grid.RowDefinitions>
 
         <CommandBar Grid.Row="0" DefaultLabelPosition="Right">
-            <AppBarButton x:ConnectionId='43' x:Name="RecordButton" Icon="Microphone" Label="録音"                       />
-            <AppBarButton x:ConnectionId='44' x:Name="StopRecordButton" Icon="Stop" Label="停止" Visibility="Collapsed"                           />
-            <AppBarButton x:ConnectionId='45' x:Name="CancelButton" Icon="Cancel" Label="キャンセル" Visibility="Collapsed"                       />
-            <AppBarButton x:ConnectionId='46' Icon="Setting" Label="設定"                         />
+            <AppBarButton x:ConnectionId='52' x:Name="RecordButton" Icon="Microphone" Label="録音"                       />
+            <AppBarButton x:ConnectionId='53' x:Name="StopRecordButton" Icon="Stop" Label="停止" Visibility="Collapsed"                           />
+            <AppBarButton x:ConnectionId='54' x:Name="CancelButton" Icon="Cancel" Label="キャンセル" Visibility="Collapsed"                       />
+            <AppBarButton x:ConnectionId='55' Icon="Setting" Label="設定"                         />
         </CommandBar>
 
         <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto">
             <StackPanel Spacing="4" Padding="8">
 
                 <!-- ===== 入力 ===== -->
-                <Expander IsExpanded="True" HorizontalAlignment="Stretch" HorizontalContentAlignment="Stretch">
+                <Expander x:ConnectionId='5' x:Name="InputSection" IsExpanded="True" HorizontalAlignment="Stretch" HorizontalContentAlignment="Stretch">
                     <Expander.Header>
                         <Border Background="#200078D4" CornerRadius="4" Padding="10,6" Margin="-12,-6,-12,-6">
                             <StackPanel Orientation="Horizontal" Spacing="8">
@@ -31,14 +31,14 @@
                         </Border>
                     </Expander.Header>
                     <StackPanel Spacing="8" Padding="8">
-                        <ComboBox x:ConnectionId='41' x:Name="AudioSourcePicker" Header="入力ソース" DisplayMemberPath="Name" HorizontalAlignment="Stretch" />
+                        <ComboBox x:ConnectionId='50' x:Name="AudioSourcePicker" Header="入力ソース" DisplayMemberPath="Name" HorizontalAlignment="Stretch" />
                         <TextBlock Text="音声レベル" FontSize="12" />
-                        <ProgressBar x:ConnectionId='42' x:Name="LevelMeter" Maximum="1" Value="0" Height="8" />
+                        <ProgressBar x:ConnectionId='51' x:Name="LevelMeter" Maximum="1" Value="0" Height="8" />
                     </StackPanel>
                 </Expander>
 
                 <!-- ===== リアルタイム文字起こし ===== -->
-                <Expander x:ConnectionId='5' x:Name="RealtimeSection" IsExpanded="True" HorizontalAlignment="Stretch" HorizontalContentAlignment="Stretch">
+                <Expander x:ConnectionId='6' x:Name="RealtimeSection" IsExpanded="True" HorizontalAlignment="Stretch" HorizontalContentAlignment="Stretch">
                     <Expander.Header>
                         <Border Background="#20E74856" CornerRadius="4" Padding="10,6" Margin="-12,-6,-12,-6">
                             <StackPanel Orientation="Horizontal" Spacing="8">
@@ -53,37 +53,37 @@
                         </Grid.ColumnDefinitions>
                         <StackPanel Grid.Column="0" Margin="0,0,4,0">
                             <StackPanel Orientation="Horizontal" Spacing="8" Padding="4">
-                                <Border x:ConnectionId='37' x:Name="LanguageBadge" Background="{ThemeResource SystemAccentColor}" CornerRadius="4" Padding="6,2" Visibility="Collapsed">
-                                    <TextBlock x:ConnectionId='40' x:Name="LanguageBadgeText" FontSize="11" Foreground="White" />
+                                <Border x:ConnectionId='46' x:Name="LanguageBadge" Background="{ThemeResource SystemAccentColor}" CornerRadius="4" Padding="6,2" Visibility="Collapsed">
+                                    <TextBlock x:ConnectionId='49' x:Name="LanguageBadgeText" FontSize="11" Foreground="White" />
                                 </Border>
-                                <TextBlock x:ConnectionId='38' x:Name="RealtimeErrorText" FontSize="11" Foreground="Red" VerticalAlignment="Center" />
-                                <Button x:ConnectionId='39'                       ><StackPanel Orientation="Horizontal" Spacing="4"><FontIcon Glyph="&#xE8C8;" FontSize="12" /><TextBlock Text="コピー" /></StackPanel></Button>
+                                <TextBlock x:ConnectionId='47' x:Name="RealtimeErrorText" FontSize="11" Foreground="Red" VerticalAlignment="Center" />
+                                <Button x:ConnectionId='48' x:Name="CopyRealtimeBtn" IsEnabled="False"                       ><StackPanel Orientation="Horizontal" Spacing="4"><FontIcon Glyph="&#xE8C8;" FontSize="12" /><TextBlock Text="コピー" /></StackPanel></Button>
                             </StackPanel>
-                            <Border BorderBrush="{ThemeResource SystemControlForegroundBaseMediumBrush}" BorderThickness="1" CornerRadius="4" Margin="4" MinHeight="80">
-                                <ScrollViewer x:ConnectionId='33' x:Name="RealtimeScrollViewer" MaxHeight="200" VerticalScrollBarVisibility="Auto">
-                                    <RichTextBlock x:ConnectionId='34' x:Name="RealtimeRichText" TextWrapping="Wrap" IsTextSelectionEnabled="True" Padding="8">
-                                        <Paragraph><Run x:ConnectionId='35' x:Name="RealtimeFinalRun" /><Run x:ConnectionId='36' x:Name="RealtimePartialRun" Foreground="Gray" /></Paragraph>
+                            <Border BorderBrush="{ThemeResource SystemControlForegroundBaseMediumBrush}" BorderThickness="1" CornerRadius="4" Margin="4" Height="150">
+                                <ScrollViewer x:ConnectionId='42' x:Name="RealtimeScrollViewer" VerticalScrollBarVisibility="Auto">
+                                    <RichTextBlock x:ConnectionId='43' x:Name="RealtimeRichText" TextWrapping="Wrap" IsTextSelectionEnabled="True" Padding="8">
+                                        <Paragraph><Run x:ConnectionId='44' x:Name="RealtimeFinalRun" /><Run x:ConnectionId='45' x:Name="RealtimePartialRun" Foreground="Gray" /></Paragraph>
                                     </RichTextBlock>
                                 </ScrollViewer>
                             </Border>
                         </StackPanel>
                         <StackPanel Grid.Column="1" Margin="4,0,0,0">
                             <StackPanel Orientation="Horizontal" Spacing="4" Padding="4">
-                                <ComboBox x:ConnectionId='30' x:Name="RealtimeTranslateLang" Width="120" />
-                                <ProgressRing x:ConnectionId='31' x:Name="RealtimeTranslateProgress" IsActive="False" Width="16" Height="16" />
-                                <Button x:ConnectionId='32'                                  ><StackPanel Orientation="Horizontal" Spacing="4"><FontIcon Glyph="&#xE8C8;" FontSize="12" /><TextBlock Text="コピー" /></StackPanel></Button>
+                                <ComboBox x:ConnectionId='39' x:Name="RealtimeTranslateLang" Width="120" />
+                                <ProgressRing x:ConnectionId='40' x:Name="RealtimeTranslateProgress" IsActive="False" Width="16" Height="16" />
+                                <Button x:ConnectionId='41' x:Name="CopyRealtimeTransBtn" IsEnabled="False"                                  ><StackPanel Orientation="Horizontal" Spacing="4"><FontIcon Glyph="&#xE8C8;" FontSize="12" /><TextBlock Text="コピー" /></StackPanel></Button>
                             </StackPanel>
-                            <Border BorderBrush="{ThemeResource SystemControlForegroundBaseMediumBrush}" BorderThickness="1" CornerRadius="4" Margin="4" MinHeight="80">
-                                <ScrollViewer MaxHeight="200" VerticalScrollBarVisibility="Auto">
-                                    <TextBlock x:ConnectionId='29' x:Name="RealtimeTranslationText" TextWrapping="Wrap" IsTextSelectionEnabled="True" Padding="8" />
-                                </ScrollViewer>
-                            </Border>
+                            <TextBox x:ConnectionId='38' x:Name="RealtimeTranslationText" TextWrapping="Wrap" IsReadOnly="True"
+                                     AcceptsReturn="True" Height="150"
+                                     ScrollViewer.VerticalScrollBarVisibility="Auto"
+                                     BorderBrush="{ThemeResource SystemControlForegroundBaseMediumBrush}"
+                                     BorderThickness="1" CornerRadius="4" Margin="4" Padding="8" />
                         </StackPanel>
                     </Grid>
                 </Expander>
 
                 <!-- ===== 音声文字起こし ===== -->
-                <Expander IsExpanded="True" HorizontalAlignment="Stretch" HorizontalContentAlignment="Stretch">
+                <Expander x:ConnectionId='7' x:Name="TranscriptSection" IsExpanded="True" HorizontalAlignment="Stretch" HorizontalContentAlignment="Stretch">
                     <Expander.Header>
                         <Border Background="#2016C60C" CornerRadius="4" Padding="10,6" Margin="-12,-6,-12,-6">
                             <StackPanel Orientation="Horizontal" Spacing="8">
@@ -93,53 +93,54 @@
                         </Border>
                     </Expander.Header>
                     <StackPanel Margin="0,4">
-                        <Border x:ConnectionId='13' x:Name="DropZone" BorderBrush="{ThemeResource SystemControlForegroundBaseMediumBrush}" BorderThickness="1" CornerRadius="4" Padding="8" Margin="8,4" Background="Transparent" AllowDrop="True"                                    >
+                        <Border x:ConnectionId='21' x:Name="DropZone" BorderBrush="{ThemeResource SystemControlForegroundBaseMediumBrush}" BorderThickness="1" CornerRadius="4" Padding="8" Margin="8,4" Background="Transparent" AllowDrop="True"                                    >
                             <StackPanel Orientation="Horizontal" Spacing="8">
                                 <FontIcon Glyph="&#xE898;" FontSize="20" />
                                 <TextBlock Text="ドラッグ＆ドロップで対応ファイルをアップロード" VerticalAlignment="Center" />
-                                <Button x:ConnectionId='28'                        ><StackPanel Orientation="Horizontal" Spacing="4"><FontIcon Glyph="&#xE8E5;" FontSize="14" /><TextBlock Text="ファイルを選択" /></StackPanel></Button>
+                                <Button x:ConnectionId='37'                        ><StackPanel Orientation="Horizontal" Spacing="4"><FontIcon Glyph="&#xE8E5;" FontSize="14" /><TextBlock Text="ファイルを選択" /></StackPanel></Button>
                             </StackPanel>
                         </Border>
-                        <Grid x:ConnectionId='14' x:Name="PlayerPanel" Padding="8,4" Visibility="Collapsed">
+                        <Grid x:ConnectionId='22' x:Name="PlayerPanel" Padding="8,4" Visibility="Collapsed">
                             <Grid.ColumnDefinitions><ColumnDefinition Width="Auto" /><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
-                            <Button x:ConnectionId='25' x:Name="PlayPauseButton" Content="&#xE768;" FontFamily="Segoe MDL2 Assets"                     Width="36" Height="36" Grid.Column="0" />
-                            <Slider x:ConnectionId='26' x:Name="PositionSlider" Minimum="0" Margin="8,0"                                        Grid.Column="1" />
-                            <TextBlock x:ConnectionId='27' x:Name="TimeText" Text="00:00 / 00:00" VerticalAlignment="Center" FontSize="12" Grid.Column="2" />
+                            <Button x:ConnectionId='34' x:Name="PlayPauseButton" Content="&#xE768;" FontFamily="Segoe MDL2 Assets"                     Width="36" Height="36" Grid.Column="0" />
+                            <Slider x:ConnectionId='35' x:Name="PositionSlider" Minimum="0" Margin="8,0"                                        Grid.Column="1" />
+                            <TextBlock x:ConnectionId='36' x:Name="TimeText" Text="00:00 / 00:00" VerticalAlignment="Center" FontSize="12" Grid.Column="2" />
                         </Grid>
-                        <TextBlock x:ConnectionId='15' x:Name="FileInfoText" Padding="8,2" FontSize="12" Foreground="{ThemeResource SystemControlForegroundBaseMediumBrush}" />
-                        <ProgressBar x:ConnectionId='16' x:Name="TranscriptionProgressBar" Maximum="100" Value="0" Visibility="Collapsed" Margin="8,4" />
+                        <TextBlock x:ConnectionId='23' x:Name="FileInfoText" Padding="8,2" FontSize="12" Foreground="{ThemeResource SystemControlForegroundBaseMediumBrush}" />
+                        <ProgressBar x:ConnectionId='24' x:Name="TranscriptionProgressBar" Maximum="100" Value="0" Visibility="Collapsed" Margin="8,4" />
                         <Grid>
                             <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
                             <StackPanel Grid.Column="0" Margin="0,0,4,0">
                                 <StackPanel Orientation="Horizontal" Spacing="4" Padding="4">
-                                    <Button x:ConnectionId='23'                          ><StackPanel Orientation="Horizontal" Spacing="4"><FontIcon Glyph="&#xE8C1;" FontSize="14" /><TextBlock Text="文字起こし＋要約" /></StackPanel></Button>
-                                    <Button x:ConnectionId='24'                         ><StackPanel Orientation="Horizontal" Spacing="4"><FontIcon Glyph="&#xE8C8;" FontSize="12" /><TextBlock Text="コピー" /></StackPanel></Button>
+                                    <ComboBox x:ConnectionId='31' x:Name="TranscriptionLangCombo" Width="120" />
+                                    <Button x:ConnectionId='32' x:Name="TranscribeButton"                          ><StackPanel Orientation="Horizontal" Spacing="4"><FontIcon Glyph="&#xE8C1;" FontSize="14" /><TextBlock Text="文字起こし＋要約" /></StackPanel></Button>
+                                    <Button x:ConnectionId='33' x:Name="CopyTranscriptBtn" IsEnabled="False"                         ><StackPanel Orientation="Horizontal" Spacing="4"><FontIcon Glyph="&#xE8C8;" FontSize="12" /><TextBlock Text="コピー" /></StackPanel></Button>
                                 </StackPanel>
-                                <Border BorderBrush="{ThemeResource SystemControlForegroundBaseMediumBrush}" BorderThickness="1" CornerRadius="4" Margin="4" MinHeight="80">
-                                    <ScrollViewer MaxHeight="300" VerticalScrollBarVisibility="Auto">
-                                        <TextBlock x:ConnectionId='22' x:Name="TranscriptText" TextWrapping="Wrap" IsTextSelectionEnabled="True" Padding="8" />
-                                    </ScrollViewer>
-                                </Border>
+                                <TextBox x:ConnectionId='30' x:Name="TranscriptText" TextWrapping="Wrap" IsReadOnly="True"
+                                         AcceptsReturn="True" Height="150"
+                                         ScrollViewer.VerticalScrollBarVisibility="Auto"
+                                         BorderBrush="{ThemeResource SystemControlForegroundBaseMediumBrush}"
+                                         BorderThickness="1" CornerRadius="4" Margin="4" Padding="8" />
                             </StackPanel>
                             <StackPanel Grid.Column="1" Margin="4,0,0,0">
                                 <StackPanel Orientation="Horizontal" Spacing="4" Padding="4">
-                                    <ComboBox x:ConnectionId='18' x:Name="TranscriptTranslateLang" Width="120" />
-                                    <Button x:ConnectionId='19'                              ><StackPanel Orientation="Horizontal" Spacing="4"><FontIcon Glyph="&#xE8C3;" FontSize="12" /><TextBlock Text="翻訳" /></StackPanel></Button>
-                                    <ProgressRing x:ConnectionId='20' x:Name="TranscriptTranslateProgress" IsActive="False" Width="16" Height="16" />
-                                    <Button x:ConnectionId='21'                                    ><StackPanel Orientation="Horizontal" Spacing="4"><FontIcon Glyph="&#xE8C8;" FontSize="12" /><TextBlock Text="コピー" /></StackPanel></Button>
+                                    <ComboBox x:ConnectionId='26' x:Name="TranscriptTranslateLang" Width="120" />
+                                    <Button x:ConnectionId='27' x:Name="TranslateTranscriptBtn" IsEnabled="False"                              ><StackPanel Orientation="Horizontal" Spacing="4"><FontIcon Glyph="&#xE8C3;" FontSize="12" /><TextBlock Text="翻訳" /></StackPanel></Button>
+                                    <ProgressRing x:ConnectionId='28' x:Name="TranscriptTranslateProgress" IsActive="False" Width="16" Height="16" />
+                                    <Button x:ConnectionId='29' x:Name="CopyTranscriptTransBtn" IsEnabled="False"                                    ><StackPanel Orientation="Horizontal" Spacing="4"><FontIcon Glyph="&#xE8C8;" FontSize="12" /><TextBlock Text="コピー" /></StackPanel></Button>
                                 </StackPanel>
-                                <Border BorderBrush="{ThemeResource SystemControlForegroundBaseMediumBrush}" BorderThickness="1" CornerRadius="4" Margin="4" MinHeight="80">
-                                    <ScrollViewer MaxHeight="300" VerticalScrollBarVisibility="Auto">
-                                        <TextBlock x:ConnectionId='17' x:Name="TranscriptTranslationText" TextWrapping="Wrap" IsTextSelectionEnabled="True" Padding="8" />
-                                    </ScrollViewer>
-                                </Border>
+                                <TextBox x:ConnectionId='25' x:Name="TranscriptTranslationText" TextWrapping="Wrap" IsReadOnly="True"
+                                         AcceptsReturn="True" Height="150"
+                                         ScrollViewer.VerticalScrollBarVisibility="Auto"
+                                         BorderBrush="{ThemeResource SystemControlForegroundBaseMediumBrush}"
+                                         BorderThickness="1" CornerRadius="4" Margin="4" Padding="8" />
                             </StackPanel>
                         </Grid>
                     </StackPanel>
                 </Expander>
 
                 <!-- ===== 要約 ===== -->
-                <Expander IsExpanded="True" HorizontalAlignment="Stretch" HorizontalContentAlignment="Stretch">
+                <Expander x:ConnectionId='8' x:Name="SummarySection" IsExpanded="True" HorizontalAlignment="Stretch" HorizontalContentAlignment="Stretch">
                     <Expander.Header>
                         <Border Background="#20F7630C" CornerRadius="4" Padding="10,6" Margin="-12,-6,-12,-6">
                             <StackPanel Orientation="Horizontal" Spacing="8">
@@ -148,32 +149,59 @@
                             </StackPanel>
                         </Border>
                     </Expander.Header>
-                    <Grid Margin="0,4">
-                        <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
-                        <StackPanel Grid.Column="0" Margin="0,0,4,0">
-                            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Padding="4">
-                                <Button x:ConnectionId='12'                      ><StackPanel Orientation="Horizontal" Spacing="4"><FontIcon Glyph="&#xE8C8;" FontSize="12" /><TextBlock Text="コピー" /></StackPanel></Button>
-                            </StackPanel>
-                            <Border BorderBrush="{ThemeResource SystemControlForegroundBaseMediumBrush}" BorderThickness="1" CornerRadius="4" Margin="4" MinHeight="60">
-                                <ScrollViewer MaxHeight="200" VerticalScrollBarVisibility="Auto">
-                                    <TextBlock x:ConnectionId='11' x:Name="SummaryText" TextWrapping="Wrap" IsTextSelectionEnabled="True" Padding="8" />
-                                </ScrollViewer>
-                            </Border>
+                    <StackPanel Margin="0,4">
+                        <!-- 基盤モデル表示 + プロンプト + ボタン -->
+                        <StackPanel Orientation="Horizontal" Spacing="4" Margin="4,0,4,4">
+                            <FontIcon Glyph="&#xE950;" FontSize="12" Foreground="Gray" />
+                            <TextBlock x:ConnectionId='20' x:Name="BedrockModelLabel" Text="ローカル要約" FontSize="11" Foreground="Gray" />
                         </StackPanel>
-                        <StackPanel Grid.Column="1" Margin="4,0,0,0">
-                            <StackPanel Orientation="Horizontal" Spacing="4" Padding="4">
-                                <ComboBox x:ConnectionId='7' x:Name="SummaryTranslateLang" Width="120" />
-                                <Button x:ConnectionId='8'                           ><StackPanel Orientation="Horizontal" Spacing="4"><FontIcon Glyph="&#xE8C3;" FontSize="12" /><TextBlock Text="翻訳" /></StackPanel></Button>
-                                <ProgressRing x:ConnectionId='9' x:Name="SummaryTranslateProgress" IsActive="False" Width="16" Height="16" />
-                                <Button x:ConnectionId='10'                                 ><StackPanel Orientation="Horizontal" Spacing="4"><FontIcon Glyph="&#xE8C8;" FontSize="12" /><TextBlock Text="コピー" /></StackPanel></Button>
+                        <Grid Margin="4,0,4,4">
+                            <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="140" /></Grid.ColumnDefinitions>
+                            <TextBox x:ConnectionId='16' x:Name="SummaryPromptBox" Grid.Column="0" PlaceholderText="追加プロンプト（例: 箇条書きで要約して）"
+                                     AcceptsReturn="True" TextWrapping="Wrap" MinHeight="40" MaxHeight="80" />
+                            <StackPanel Grid.Column="1" Spacing="4" Margin="4,0,0,0">
+                                <Button x:ConnectionId='17' x:Name="SummaryFileBtn"                            HorizontalAlignment="Stretch">
+                                    <StackPanel Orientation="Horizontal" Spacing="4" HorizontalAlignment="Center">
+                                        <FontIcon Glyph="&#xE8E5;" FontSize="12" />
+                                        <TextBlock Text="ファイルから要約" />
+                                    </StackPanel>
+                                </Button>
+                                <Button x:ConnectionId='18' x:Name="ResummarizeBtn"                            HorizontalAlignment="Stretch">
+                                    <StackPanel Orientation="Horizontal" Spacing="4" HorizontalAlignment="Center">
+                                        <FontIcon Glyph="&#xE8A5;" FontSize="12" />
+                                        <TextBlock Text="要約" />
+                                    </StackPanel>
+                                </Button>
+                                <ProgressRing x:ConnectionId='19' x:Name="SummarizeProgress" IsActive="False" Width="20" Height="20" />
                             </StackPanel>
-                            <Border BorderBrush="{ThemeResource SystemControlForegroundBaseMediumBrush}" BorderThickness="1" CornerRadius="4" Margin="4" MinHeight="60">
-                                <ScrollViewer MaxHeight="200" VerticalScrollBarVisibility="Auto">
-                                    <TextBlock x:ConnectionId='6' x:Name="SummaryTranslationText" TextWrapping="Wrap" IsTextSelectionEnabled="True" Padding="8" />
-                                </ScrollViewer>
-                            </Border>
-                        </StackPanel>
-                    </Grid>
+                        </Grid>
+                        <Grid>
+                            <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
+                            <StackPanel Grid.Column="0" Margin="0,0,4,0">
+                                <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Padding="4">
+                                    <Button x:ConnectionId='15' x:Name="CopySummaryBtn" IsEnabled="False"                      ><StackPanel Orientation="Horizontal" Spacing="4"><FontIcon Glyph="&#xE8C8;" FontSize="12" /><TextBlock Text="コピー" /></StackPanel></Button>
+                                </StackPanel>
+                                <TextBox x:ConnectionId='14' x:Name="SummaryText" TextWrapping="Wrap" IsReadOnly="True"
+                                         AcceptsReturn="True" Height="150"
+                                         ScrollViewer.VerticalScrollBarVisibility="Auto"
+                                         BorderBrush="{ThemeResource SystemControlForegroundBaseMediumBrush}"
+                                         BorderThickness="1" CornerRadius="4" Margin="4" Padding="8" />
+                            </StackPanel>
+                            <StackPanel Grid.Column="1" Margin="4,0,0,0">
+                                <StackPanel Orientation="Horizontal" Spacing="4" Padding="4">
+                                    <ComboBox x:ConnectionId='10' x:Name="SummaryTranslateLang" Width="120" />
+                                    <Button x:ConnectionId='11' x:Name="TranslateSummaryBtn" IsEnabled="False"                           ><StackPanel Orientation="Horizontal" Spacing="4"><FontIcon Glyph="&#xE8C3;" FontSize="12" /><TextBlock Text="翻訳" /></StackPanel></Button>
+                                    <ProgressRing x:ConnectionId='12' x:Name="SummaryTranslateProgress" IsActive="False" Width="16" Height="16" />
+                                    <Button x:ConnectionId='13' x:Name="CopySummaryTransBtn" IsEnabled="False"                                 ><StackPanel Orientation="Horizontal" Spacing="4"><FontIcon Glyph="&#xE8C8;" FontSize="12" /><TextBlock Text="コピー" /></StackPanel></Button>
+                                </StackPanel>
+                                <TextBox x:ConnectionId='9' x:Name="SummaryTranslationText" TextWrapping="Wrap" IsReadOnly="True"
+                                         AcceptsReturn="True" Height="150"
+                                         ScrollViewer.VerticalScrollBarVisibility="Auto"
+                                         BorderBrush="{ThemeResource SystemControlForegroundBaseMediumBrush}"
+                                         BorderThickness="1" CornerRadius="4" Margin="4" Padding="8" />
+                            </StackPanel>
+                        </Grid>
+                    </StackPanel>
                 </Expander>
             </StackPanel>
         </ScrollViewer>

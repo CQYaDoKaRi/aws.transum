@@ -40,7 +40,7 @@
 
 #### 受け入れ基準（Acceptance Criteria）
 
-1. THE TranscribeStreamingClient SHALL 言語自動判別機能を使用して日本語（ja-JP）と英語（en-US）を判別する
+1. THE TranscribeStreamingClient SHALL 言語自動判別機能を使用して日本語（ja-JP）と英語（en-US）を含む21言語を判別する
 2. WHEN 言語が判別された場合、THE App SHALL 判別された言語名をバッジとして表示する
 3. WHERE ユーザーが言語自動判別を無効にした場合、THE TranscribeStreamingClient SHALL 手動選択された言語で文字起こしを実行する
 4. THE App SHALL 言語自動判別の有効・無効を切り替えるToggleSwitchを設定画面に提供する
@@ -57,6 +57,7 @@
 4. WHEN ユーザーが翻訳先言語を変更した場合、THE TranslateClient SHALL 確定済みテキスト全体を再翻訳する
 5. IF 翻訳APIの呼び出しに失敗した場合、THEN THE TranslateClient SHALL 指数バックオフで最大3回再試行する（1s, 2s, 4s）
 6. THE TranslateClient SHALL FinalTranscript確定ごとに1回の翻訳リクエストを送信する
+7. WHEN FinalTranscriptを受信した場合、THE App SHALL リアルタイムテキスト全体の自動翻訳をトリガーする
 
 ### 要件 4: リアルタイム文字起こしプレビューUI（Realtime Transcription Preview UI）
 

@@ -38,6 +38,7 @@ public partial class MainViewModel : ObservableObject
     [ObservableProperty] private double _transcriptionProgress;
     [ObservableProperty] private bool _isCapturing;
     [ObservableProperty] private bool _isSummarizing;
+    [ObservableProperty] private bool _isTranscribing;
     [ObservableProperty] private float _audioLevel;
     [ObservableProperty] private string? _errorMessage;
     [ObservableProperty] private string _summaryAdditionalPrompt = "";
@@ -45,6 +46,7 @@ public partial class MainViewModel : ObservableObject
     [ObservableProperty] private TimeSpan _playbackPosition;
     [ObservableProperty] private List<AudioSourceInfo> _audioSources = new();
     [ObservableProperty] private AudioSourceInfo? _selectedSource;
+    [ObservableProperty] private TranscriptionLanguage _selectedTranscriptionLanguage = TranscriptionLanguage.Auto;
 
     // Status monitor display
     [ObservableProperty] private string _appCpuDisplay = "アプリ 0%";
@@ -150,10 +152,16 @@ public partial class MainViewModel : ObservableObject
         if (AudioFile == null) return;
         ErrorMessage = null;
         _lastOperation = TranscribeAndSummarizeAsync;
+        IsTranscribing = true;
+
+        // 文字起こし開始時にテキストクリア
+        Transcript = null;
+        Summary = null;
+        TranscriptTranslationVM.Reset();
+        SummaryTranslationVM.Reset();
 
         try
         {
-            // Transcription via AWS Transcribe
             TranscriptionProgress = 0;
             var progress = new Progress<double>(p =>
             {
@@ -161,13 +169,12 @@ public partial class MainViewModel : ObservableObject
             });
 
             var settings = _settingsStore.Load();
-            var language = settings.IsAutoDetectEnabled ? "ja-JP" : "ja-JP";
+            var language = SelectedTranscriptionLanguage.ToCode();
 
             var transcript = await _transcribeClient.TranscribeAsync(
                 AudioFile, language, progress);
             Transcript = transcript;
 
-            // Summarize
             IsSummarizing = true;
             try
             {
@@ -179,46 +186,71 @@ public partial class MainViewModel : ObservableObject
             }
             IsSummarizing = false;
 
-            // Auto-export if directory is configured
             if (!string.IsNullOrEmpty(settings.ExportDirectoryPath) && Transcript != null)
             {
-                try
-                {
-                    _exportManager.Export(Transcript, Summary, settings.ExportDirectoryPath);
-                }
-                catch (AppError ex)
-                {
-                    ErrorMessage = ex.Message;
-                }
+                try { _exportManager.Export(Transcript, Summary, settings.ExportDirectoryPath, AudioFile?.FileName); }
+                catch (AppError ex) { ErrorMessage = ex.Message; }
             }
         }
-        catch (AppError ex)
-        {
-            ErrorMessage = ex.Message;
-        }
-        catch (Exception ex)
-        {
-            ErrorMessage = $"処理エラー: {ex.Message}";
-        }
-        finally
-        {
-            IsSummarizing = false;
-        }
+        catch (AppError ex) { ErrorMessage = ex.Message; ErrorLogger.SaveErrorLog(ex, "文字起こし＋要約", new Dictionary<string, string> { ["audioFile"] = AudioFile?.FileName ?? "null" }); }
+        catch (Exception ex) { ErrorMessage = $"処理エラー: {ex.Message}"; ErrorLogger.SaveErrorLog(ex, "文字起こし＋要約_予期しないエラー", new Dictionary<string, string> { ["audioFile"] = AudioFile?.FileName ?? "null" }); }
+        finally { IsSummarizing = false; IsTranscribing = false; }
     }
 
     [RelayCommand]
     private async Task ResummarizeAsync()
     {
-        if (Transcript == null) return;
+        await SummarizeWithAvailableTextAsync();
+    }
+
+    /// <summary>
+    /// 利用可能なテキスト（Transcript、リアルタイム文字起こし、または追加プロンプトのみ）でBedrock要約を実行
+    /// </summary>
+    private async Task SummarizeWithAvailableTextAsync()
+    {
         ErrorMessage = null;
+
+        // 1. Transcriptがあればそれを使う
+        // 2. なければリアルタイム文字起こしテキストからTranscriptを生成
+        // 3. どちらもなければ追加プロンプトだけでBedrockに問い合わせ
+        if (Transcript == null)
+        {
+            var realtimeText = RealtimeTranscriptionVM.FinalText?.Trim();
+            if (!string.IsNullOrEmpty(realtimeText))
+            {
+                Transcript = new Transcript(
+                    Guid.NewGuid(),
+                    AudioFile?.Id ?? Guid.NewGuid(),
+                    realtimeText,
+                    RealtimeTranscriptionVM.DetectedLanguage ?? "ja-JP",
+                    DateTime.Now);
+            }
+            else
+            {
+                ErrorMessage = "要約するテキストがありません。文字起こしを実行するか、ファイルから読み込んでください。";
+                return;
+            }
+        }
+
         IsSummarizing = true;
+        // 要約開始時にクリア
+        Summary = null;
+        SummaryTranslationVM.Reset();
         try
         {
             Summary = await _summarizer.SummarizeAsync(Transcript, SummaryAdditionalPrompt);
+
+            // 要約結果をファイルに保存（上書き）
+            SaveSummaryToFile();
         }
         catch (Exception ex)
         {
             ErrorMessage = $"要約に失敗しました: {ex.Message}";
+            ErrorLogger.SaveErrorLog(ex, "要約失敗", new Dictionary<string, string>
+            {
+                ["transcriptLength"] = Transcript?.Text?.Length.ToString() ?? "0",
+                ["additionalPrompt"] = SummaryAdditionalPrompt ?? ""
+            });
         }
         finally
         {
@@ -247,11 +279,21 @@ public partial class MainViewModel : ObservableObject
             );
             Transcript = tempTranscript;
             IsSummarizing = true;
+            // 要約開始時にクリア
+            Summary = null;
+            SummaryTranslationVM.Reset();
             Summary = await _summarizer.SummarizeAsync(tempTranscript, SummaryAdditionalPrompt);
+
+            // 要約結果をファイルに保存（読み込んだファイル名ベース）
+            SaveSummaryToFile(System.IO.Path.GetFileName(filePath));
         }
         catch (Exception ex)
         {
             ErrorMessage = $"ファイルからの要約に失敗しました: {ex.Message}";
+            ErrorLogger.SaveErrorLog(ex, "ファイルから要約失敗", new Dictionary<string, string>
+            {
+                ["filePath"] = filePath ?? "null"
+            });
         }
         finally
         {
@@ -271,7 +313,7 @@ public partial class MainViewModel : ObservableObject
             var dir = settings.ExportDirectoryPath;
             if (string.IsNullOrEmpty(dir))
                 return;
-            _exportManager.Export(Transcript, Summary, dir);
+            _exportManager.Export(Transcript, Summary, dir, AudioFile?.FileName);
         }
         catch (AppError ex)
         {
@@ -332,7 +374,16 @@ public partial class MainViewModel : ObservableObject
 
         _realtimeClient.FinalTranscriptReceived += (_, text) =>
         {
-            _dispatcherQueue.TryEnqueue(() => RealtimeTranscriptionVM.AppendFinalTranscript(text));
+            _dispatcherQueue.TryEnqueue(async () =>
+            {
+                RealtimeTranscriptionVM.AppendFinalTranscript(text);
+                // リアルタイム翻訳: FinalText全体を翻訳
+                var fullText = RealtimeTranscriptionVM.FinalText;
+                if (!string.IsNullOrWhiteSpace(fullText))
+                {
+                    await RealtimeTranslationVM.TranslateCommand.ExecuteAsync(fullText);
+                }
+            });
         };
 
         _realtimeClient.LanguageDetected += (_, lang) =>
@@ -349,8 +400,9 @@ public partial class MainViewModel : ObservableObject
         _audioCaptureService.DataAvailable -= OnAudioDataForStreaming;
         _audioCaptureService.DataAvailable += OnAudioDataForStreaming;
 
-        var language = settings.IsAutoDetectEnabled ? "ja-JP" : "ja-JP";
-        await _realtimeClient.StartStreamingAsync(language, settings.IsAutoDetectEnabled);
+        var language = SelectedTranscriptionLanguage.ToCode();
+        var autoDetect = SelectedTranscriptionLanguage == TranscriptionLanguage.Auto;
+        await _realtimeClient.StartStreamingAsync(language == "auto" ? "ja-JP" : language, autoDetect);
     }
 
     private void OnAudioDataForStreaming(object? sender, byte[] data)
@@ -447,6 +499,39 @@ public partial class MainViewModel : ObservableObject
         {
             ErrorMessage = null;
             await _lastOperation();
+        }
+    }
+
+    private void SaveSummaryToFile(string? sourceFileName = null)
+    {
+        if (Summary == null) return;
+        try
+        {
+            var settings = _settingsStore.Load();
+            var dir = !string.IsNullOrEmpty(settings.ExportDirectoryPath)
+                ? settings.ExportDirectoryPath
+                : !string.IsNullOrEmpty(settings.RecordingDirectoryPath)
+                    ? settings.RecordingDirectoryPath
+                    : null;
+            if (dir == null) return;
+
+            if (!System.IO.Directory.Exists(dir))
+                System.IO.Directory.CreateDirectory(dir);
+
+            var baseName = sourceFileName ?? AudioFile?.FileName ?? DateTime.Now.ToString("yyyyMMdd_HHmmss");
+            var ext = System.IO.Path.GetExtension(baseName);
+            if (!string.IsNullOrEmpty(ext))
+                baseName = System.IO.Path.GetFileNameWithoutExtension(baseName);
+
+            var path = System.IO.Path.Combine(dir, $"{baseName}.summary.txt");
+            System.IO.File.WriteAllText(path, $"=== Summary ===\n{Summary.Text}", System.Text.Encoding.UTF8);
+        }
+        catch (Exception ex)
+        {
+            ErrorLogger.SaveErrorLog(ex, "要約ファイル保存失敗", new Dictionary<string, string>
+            {
+                ["summaryLength"] = Summary.Text.Length.ToString()
+            });
         }
     }
 

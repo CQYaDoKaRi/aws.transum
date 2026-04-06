@@ -10,6 +10,7 @@ C:\Users\inadati\OneDrive - amazon.com\ドキュメント\dev\windows\AudioTrans
 C:\Users\inadati\OneDrive - amazon.com\ドキュメント\dev\windows\AudioTranscriptionSummary\bin\x64\Release\net8.0-windows10.0.19041.0\AudioTranscriptionSummary.pdb
 C:\Users\inadati\OneDrive - amazon.com\ドキュメント\dev\windows\AudioTranscriptionSummary\bin\x64\Release\net8.0-windows10.0.19041.0\AudioTranscriptionSummary.pri
 C:\Users\inadati\OneDrive - amazon.com\ドキュメント\dev\windows\AudioTranscriptionSummary\bin\x64\Release\net8.0-windows10.0.19041.0\Microsoft.Web.WebView2.Core.dll
+C:\Users\inadati\OneDrive - amazon.com\ドキュメント\dev\windows\AudioTranscriptionSummary\bin\x64\Release\net8.0-windows10.0.19041.0\AWSSDK.BedrockRuntime.dll
 C:\Users\inadati\OneDrive - amazon.com\ドキュメント\dev\windows\AudioTranscriptionSummary\bin\x64\Release\net8.0-windows10.0.19041.0\AWSSDK.Core.dll
 C:\Users\inadati\OneDrive - amazon.com\ドキュメント\dev\windows\AudioTranscriptionSummary\bin\x64\Release\net8.0-windows10.0.19041.0\AWSSDK.S3.dll
 C:\Users\inadati\OneDrive - amazon.com\ドキュメント\dev\windows\AudioTranscriptionSummary\bin\x64\Release\net8.0-windows10.0.19041.0\AWSSDK.TranscribeService.dll
@@ -39,6 +40,7 @@ C:\Users\inadati\OneDrive - amazon.com\ドキュメント\dev\windows\AudioTrans
 C:\Users\inadati\OneDrive - amazon.com\ドキュメント\dev\windows\AudioTranscriptionSummary\bin\x64\Release\net8.0-windows10.0.19041.0\NAudio.Wasapi.dll
 C:\Users\inadati\OneDrive - amazon.com\ドキュメント\dev\windows\AudioTranscriptionSummary\bin\x64\Release\net8.0-windows10.0.19041.0\NAudio.WinForms.dll
 C:\Users\inadati\OneDrive - amazon.com\ドキュメント\dev\windows\AudioTranscriptionSummary\bin\x64\Release\net8.0-windows10.0.19041.0\NAudio.WinMM.dll
+C:\Users\inadati\OneDrive - amazon.com\ドキュメント\dev\windows\AudioTranscriptionSummary\bin\x64\Release\net8.0-windows10.0.19041.0\System.Drawing.Common.dll
 C:\Users\inadati\OneDrive - amazon.com\ドキュメント\dev\windows\AudioTranscriptionSummary\bin\x64\Release\net8.0-windows10.0.19041.0\runtimes\win-arm64\native\WebView2Loader.dll
 C:\Users\inadati\OneDrive - amazon.com\ドキュメント\dev\windows\AudioTranscriptionSummary\bin\x64\Release\net8.0-windows10.0.19041.0\runtimes\win-x86\native\WebView2Loader.dll
 C:\Users\inadati\OneDrive - amazon.com\ドキュメント\dev\windows\AudioTranscriptionSummary\bin\x64\Release\net8.0-windows10.0.19041.0\runtimes\win-arm64\native\Microsoft.WindowsAppRuntime.Bootstrap.dll

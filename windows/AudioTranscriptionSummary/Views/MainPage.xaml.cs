@@ -26,7 +26,7 @@ public sealed partial class MainPage : Page
 
     private void MainPage_Loaded(object sender, RoutedEventArgs e)
     {
-        // Populate language ComboBoxes
+        // Populate translation language ComboBoxes
         var languages = Enum.GetValues<TranslationLanguage>();
         foreach (var lang in languages)
         {
@@ -37,6 +37,17 @@ public sealed partial class MainPage : Page
         RealtimeTranslateLang.SelectedIndex = 0;
         TranscriptTranslateLang.SelectedIndex = 0;
         SummaryTranslateLang.SelectedIndex = 0;
+
+        // Populate transcription language ComboBox
+        var transcriptionLangs = Enum.GetValues<TranscriptionLanguage>();
+        foreach (var lang in transcriptionLangs)
+            TranscriptionLangCombo.Items.Add(lang.ToDisplayName());
+        TranscriptionLangCombo.SelectedIndex = 0; // Auto
+        TranscriptionLangCombo.SelectionChanged += (_, _) =>
+        {
+            if (TranscriptionLangCombo.SelectedIndex >= 0)
+                _vm.SelectedTranscriptionLanguage = transcriptionLangs[TranscriptionLangCombo.SelectedIndex];
+        };
 
         // Sync ComboBox selection to ViewModels
         RealtimeTranslateLang.SelectionChanged += (_, _) =>
@@ -72,6 +83,16 @@ public sealed partial class MainPage : Page
         RealtimeSection.Visibility = settings.IsRealtimeEnabled
             ? Visibility.Visible : Visibility.Collapsed;
 
+        // Bedrock モデルラベル更新
+        UpdateBedrockModelLabel(settings);
+
+        // 初期状態: 音声ファイル未選択なので文字起こしボタン無効
+        TranscribeButton.IsEnabled = false;
+        TranscriptionLangCombo.IsEnabled = false;
+
+        // テキストエリアのリサイズ対応
+        this.SizeChanged += OnPageSizeChanged;
+
         // Wire MainViewModel property changes
         _vm.PropertyChanged += (_, args) =>
         {
@@ -85,14 +106,31 @@ public sealed partial class MainPage : Page
                     break;
                 case nameof(MainViewModel.Transcript):
                     TranscriptText.Text = _vm.Transcript?.Text ?? "";
+                    TranscriptTranslationText.Text = "";
+                    CopyTranscriptBtn.IsEnabled = !string.IsNullOrEmpty(_vm.Transcript?.Text);
+                    TranslateTranscriptBtn.IsEnabled = !string.IsNullOrEmpty(_vm.Transcript?.Text);
+                    CopyTranscriptTransBtn.IsEnabled = false;
                     break;
                 case nameof(MainViewModel.Summary):
                     SummaryText.Text = _vm.Summary?.Text ?? "";
+                    CopySummaryBtn.IsEnabled = !string.IsNullOrEmpty(_vm.Summary?.Text);
+                    TranslateSummaryBtn.IsEnabled = !string.IsNullOrEmpty(_vm.Summary?.Text);
                     break;
                 case nameof(MainViewModel.TranscriptionProgress):
                     TranscriptionProgressBar.Value = _vm.TranscriptionProgress;
                     TranscriptionProgressBar.Visibility = _vm.TranscriptionProgress > 0 && _vm.TranscriptionProgress < 100
                         ? Visibility.Visible : Visibility.Collapsed;
+                    break;
+                case nameof(MainViewModel.IsTranscribing):
+                    TranscribeButton.IsEnabled = _vm.AudioFile != null && !_vm.IsTranscribing;
+                    TranscriptionLangCombo.IsEnabled = _vm.AudioFile != null && !_vm.IsTranscribing;
+                    SummaryFileBtn.IsEnabled = !_vm.IsTranscribing && !_vm.IsSummarizing;
+                    ResummarizeBtn.IsEnabled = !_vm.IsTranscribing && !_vm.IsSummarizing;
+                    break;
+                case nameof(MainViewModel.IsSummarizing):
+                    SummaryFileBtn.IsEnabled = !_vm.IsSummarizing && !_vm.IsTranscribing;
+                    ResummarizeBtn.IsEnabled = !_vm.IsSummarizing && !_vm.IsTranscribing;
+                    SummarizeProgress.IsActive = _vm.IsSummarizing;
                     break;
                 case nameof(MainViewModel.ErrorMessage):
                     if (_vm.ErrorMessage != null)
@@ -100,6 +138,8 @@ public sealed partial class MainPage : Page
                     break;
                 case nameof(MainViewModel.AudioFile):
                     UpdateFileInfo();
+                    TranscribeButton.IsEnabled = _vm.AudioFile != null && !_vm.IsTranscribing;
+                    TranscriptionLangCombo.IsEnabled = _vm.AudioFile != null && !_vm.IsTranscribing;
                     break;
                 case nameof(MainViewModel.IsPlaying):
                     PlayPauseButton.Content = _vm.IsPlaying ? "\uE769" : "\uE768";
@@ -126,6 +166,7 @@ public sealed partial class MainPage : Page
             {
                 case nameof(RealtimeTranscriptionViewModel.FinalText):
                     RealtimeFinalRun.Text = _vm.RealtimeTranscriptionVM.FinalText;
+                    CopyRealtimeBtn.IsEnabled = !string.IsNullOrEmpty(_vm.RealtimeTranscriptionVM.FinalText);
                     ScrollRealtimeToBottom();
                     break;
                 case nameof(RealtimeTranscriptionViewModel.PartialText):
@@ -157,6 +198,7 @@ public sealed partial class MainPage : Page
             {
                 case nameof(TranslationViewModel.TranslatedText):
                     RealtimeTranslationText.Text = _vm.RealtimeTranslationVM.TranslatedText;
+                    CopyRealtimeTransBtn.IsEnabled = !string.IsNullOrEmpty(_vm.RealtimeTranslationVM.TranslatedText);
                     break;
                 case nameof(TranslationViewModel.IsTranslating):
                     RealtimeTranslateProgress.IsActive = _vm.RealtimeTranslationVM.IsTranslating;
@@ -170,6 +212,7 @@ public sealed partial class MainPage : Page
             {
                 case nameof(TranslationViewModel.TranslatedText):
                     TranscriptTranslationText.Text = _vm.TranscriptTranslationVM.TranslatedText;
+                    CopyTranscriptTransBtn.IsEnabled = !string.IsNullOrEmpty(_vm.TranscriptTranslationVM.TranslatedText);
                     break;
                 case nameof(TranslationViewModel.IsTranslating):
                     TranscriptTranslateProgress.IsActive = _vm.TranscriptTranslationVM.IsTranslating;
@@ -183,6 +226,7 @@ public sealed partial class MainPage : Page
             {
                 case nameof(TranslationViewModel.TranslatedText):
                     SummaryTranslationText.Text = _vm.SummaryTranslationVM.TranslatedText;
+                    CopySummaryTransBtn.IsEnabled = !string.IsNullOrEmpty(_vm.SummaryTranslationVM.TranslatedText);
                     break;
                 case nameof(TranslationViewModel.IsTranslating):
                     SummaryTranslateProgress.IsActive = _vm.SummaryTranslationVM.IsTranslating;
@@ -250,7 +294,10 @@ public sealed partial class MainPage : Page
 
     // Transcribe
     private void OnTranscribeClick(object sender, RoutedEventArgs e)
-        => _vm.TranscribeAndSummarizeCommand.Execute(null);
+    {
+        _vm.SummaryAdditionalPrompt = SummaryPromptBox.Text;
+        _vm.TranscribeAndSummarizeCommand.Execute(null);
+    }
 
     // Play/Pause
     private void OnPlayPause(object sender, RoutedEventArgs e)
@@ -408,10 +455,42 @@ public sealed partial class MainPage : Page
         panel.Children.Add(realtimeToggle);
         panel.Children.Add(autoDetectToggle);
 
+        // グループ: 要約（Bedrock）
+        panel.Children.Add(CreateGroupLabel("🔍 要約（Bedrock）"));
+        var bedrockModelCombo = new ComboBox
+        {
+            Header = "基盤モデル",
+            HorizontalAlignment = HorizontalAlignment.Stretch,
+            Margin = new Thickness(0, 0, 0, 8)
+        };
+        var availableModels = BedrockModel.AvailableModels(settings.Region);
+        int selectedModelIdx = 0;
+        for (int i = 0; i < availableModels.Length; i++)
+        {
+            bedrockModelCombo.Items.Add(availableModels[i].DisplayName);
+            if (availableModels[i].Id == settings.BedrockModelId)
+                selectedModelIdx = i;
+        }
+        bedrockModelCombo.SelectedIndex = selectedModelIdx;
+
+        // リージョン変更時にモデルリストを更新
+        regionCombo.SelectionChanged += (_, _) =>
+        {
+            var newRegion = regionCombo.SelectedItem?.ToString() ?? "ap-northeast-1";
+            var models = BedrockModel.AvailableModels(newRegion);
+            bedrockModelCombo.Items.Clear();
+            foreach (var m in models)
+                bedrockModelCombo.Items.Add(m.DisplayName);
+            if (models.Length > 0)
+                bedrockModelCombo.SelectedIndex = 0;
+        };
+
+        panel.Children.Add(bedrockModelCombo);
+
         var dialog = new ContentDialog
         {
             Title = "設定",
-            Content = new ScrollViewer { Content = panel, MaxHeight = 600 },
+            Content = new ScrollViewer { Content = panel, MaxHeight = 650 },
             PrimaryButtonText = "保存",
             CloseButtonText = "キャンセル",
             XamlRoot = this.XamlRoot,
@@ -429,11 +508,21 @@ public sealed partial class MainPage : Page
             settings.ExportDirectoryPath = exportDirBox.Text;
             settings.IsRealtimeEnabled = realtimeToggle.IsOn;
             settings.IsAutoDetectEnabled = autoDetectToggle.IsOn;
+
+            // Bedrock モデル保存
+            var selectedRegion = regionCombo.SelectedItem?.ToString() ?? "ap-northeast-1";
+            var currentModels = BedrockModel.AvailableModels(selectedRegion);
+            if (bedrockModelCombo.SelectedIndex >= 0 && bedrockModelCombo.SelectedIndex < currentModels.Length)
+                settings.BedrockModelId = currentModels[bedrockModelCombo.SelectedIndex].Id;
+
             store.Save(settings);
 
             // Update realtime section visibility after settings change
             RealtimeSection.Visibility = settings.IsRealtimeEnabled
                 ? Visibility.Visible : Visibility.Collapsed;
+
+            // Update Bedrock model label
+            UpdateBedrockModelLabel(settings);
         }
     }
 
@@ -533,6 +622,56 @@ public sealed partial class MainPage : Page
                 Foreground = new Microsoft.UI.Xaml.Media.SolidColorBrush(Microsoft.UI.Colors.White)
             }
         };
+    }
+
+    private const double MinTextAreaHeight = 150;
+
+    private void OnPageSizeChanged(object sender, SizeChangedEventArgs e)
+    {
+        // ウィンドウ高さに応じてテキストエリアの高さを調整
+        // 利用可能な高さからUI要素分を引いて、テキストエリアに割り当て
+        var availableHeight = e.NewSize.Height;
+        // CommandBar(48) + StatusBar(28) + Expander headers(4*48=192) + buttons/padding(~200) = ~468
+        var overhead = 468;
+        var textAreaCount = 3; // リアルタイム、文字起こし、要約の3セクション
+        var calculatedHeight = Math.Max(MinTextAreaHeight, (availableHeight - overhead) / textAreaCount);
+
+        // リアルタイム文字起こし
+        var realtimeBorder = FindRealtimeBorder();
+        if (realtimeBorder != null) realtimeBorder.Height = calculatedHeight;
+        RealtimeTranslationText.Height = calculatedHeight;
+
+        // 音声文字起こし
+        TranscriptText.Height = calculatedHeight;
+        TranscriptTranslationText.Height = calculatedHeight;
+
+        // 要約
+        SummaryText.Height = calculatedHeight;
+        SummaryTranslationText.Height = calculatedHeight;
+    }
+
+    private Border? FindRealtimeBorder()
+    {
+        // RealtimeScrollViewerの親Border
+        return RealtimeScrollViewer?.Parent as Border;
+    }
+
+    private void UpdateBedrockModelLabel(AppSettings settings)
+    {
+        if (!string.IsNullOrEmpty(settings.AccessKeyId) && !string.IsNullOrEmpty(settings.SecretAccessKey))
+        {
+            var model = BedrockModel.Find(settings.BedrockModelId);
+            BedrockModelLabel.Text = model != null
+                ? $"Bedrock: {model.DisplayName}"
+                : $"Bedrock: {settings.BedrockModelId}";
+            BedrockModelLabel.Foreground = new Microsoft.UI.Xaml.Media.SolidColorBrush(
+                Microsoft.UI.ColorHelper.FromArgb(255, 0, 120, 212));
+        }
+        else
+        {
+            BedrockModelLabel.Text = "ローカル要約（AWS認証情報未設定）";
+            BedrockModelLabel.Foreground = new Microsoft.UI.Xaml.Media.SolidColorBrush(Microsoft.UI.Colors.Gray);
+        }
     }
 
     // Translation handlers

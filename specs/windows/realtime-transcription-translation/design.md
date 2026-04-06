@@ -12,6 +12,7 @@ graph TB
     AudioBufferConverter -->|PCM 16kHz 16bit mono| RealtimeTranscribeClient
     RealtimeTranscribeClient -->|Partial/Final| RealtimeTranscriptionVM
     RealtimeTranscriptionVM -->|FinalText| TranslationVM_Realtime[TranslationViewModel]
+    RealtimeTranscriptionVM -->|FinalTranscript auto-translate| TranslationVM_Realtime
 
     MainViewModel -->|transcript.Text| TranslationVM_Transcript[TranslationViewModel]
     MainViewModel -->|summary.Text| TranslationVM_Summary[TranslationViewModel]
@@ -94,7 +95,27 @@ public partial class RealtimeTranscriptionViewModel : ObservableObject
 ```
 
 注意: リアルタイム文字起こしの結果はRealtimeTranscriptionVM内にのみ保持される。MainViewModelのTranscriptフィールドはバッチ文字起こし（TranscribeAndSummarize）でのみ設定される。録音停止時にリアルタイム結果をTranscriptに代入しない。
+
+## リアルタイム自動翻訳
+
+FinalTranscript受信時に、FinalText全体の自動翻訳をトリガーする。MainViewModelのStartRealtimeStreamingAsyncで、FinalTranscriptReceivedイベントハンドラ内でRealtimeTranslationVM.TranslateCommand.ExecuteAsync(fullText)を呼び出す。
+
+```csharp
+_realtimeClient.FinalTranscriptReceived += (_, text) =>
+{
+    _dispatcherQueue.TryEnqueue(async () =>
+    {
+        RealtimeTranscriptionVM.AppendFinalTranscript(text);
+        var fullText = RealtimeTranscriptionVM.FinalText;
+        if (!string.IsNullOrWhiteSpace(fullText))
+            await RealtimeTranslationVM.TranslateCommand.ExecuteAsync(fullText);
+    });
+};
 ```
+
+## TranscriptionLanguage ComboBox
+
+TranscriptionLangCombo（ComboBox）を「文字起こし＋要約」ボタンの横に配置。TranscriptionLanguage列挙型（21言語＋Auto）の表示名をItemsに追加。選択変更時にMainViewModel.SelectedTranscriptionLanguageを更新。Auto選択時はリアルタイム文字起こしでautoDetect=trueを使用。
 
 ## UIレイアウト
 

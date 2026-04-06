@@ -59,10 +59,19 @@ public class TranscribeClient
             var startRequest = new StartTranscriptionJobRequest
             {
                 TranscriptionJobName = jobName,
-                LanguageCode = language,
                 MediaFormat = MapMediaFormat(audioFile.Extension),
                 Media = new Media { MediaFileUri = s3Uri }
             };
+
+            // 言語設定: "auto"の場合はIdentifyLanguageを使用
+            if (language == "auto")
+            {
+                startRequest.IdentifyLanguage = true;
+            }
+            else
+            {
+                startRequest.LanguageCode = language;
+            }
 
             await ExecuteWithErrorMapping(async () =>
                 await transcribeClient.StartTranscriptionJobAsync(startRequest, ct));

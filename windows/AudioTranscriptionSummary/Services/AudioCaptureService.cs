@@ -63,7 +63,7 @@ public class AudioCaptureService : IDisposable
             Directory.CreateDirectory(recordingDir);
 
         var timestamp = DateTime.Now.ToString("yyyyMMdd_HHmmss");
-        _outputPath = Path.Combine(recordingDir, $"system_audio_{timestamp}.wav");
+        _outputPath = Path.Combine(recordingDir, $"{timestamp}.wav");
 
         if (source.IsLoopback)
         {

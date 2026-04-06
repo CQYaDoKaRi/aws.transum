@@ -69,7 +69,7 @@
 
 1. WHEN エクスポート保存先が設定済みの場合、THE ExportManager SHALL 文字起こし＋要約完了後に自動的にTranscriptとSummaryをテキストファイルとして保存する
 2. THE ExportManager SHALL エクスポート保存先が設定済みの場合はダイアログなしで直接保存する（CommandBarにエクスポートボタンは配置しない）
-3. THE ExportManager SHALL 文字起こし結果を `元ファイル名.transcript.txt`、要約を `元ファイル名.summary.txt` として保存する
+3. THE ExportManager SHALL 文字起こし結果を `{音声ファイル名}.transcript.txt`、要約を `{音声ファイル名}.summary.txt` として保存する（音声ファイル名ベース、拡張子除去）
 4. THE ExportManager SHALL UTF-8エンコーディングを使用する
 5. IF 保存先に書き込み権限がない場合、THEN THE ExportManager SHALL エラーメッセージを表示する
 6. WHEN 文字起こし＋要約が成功しエクスポート保存先が設定済みの場合、THE App SHALL 自動エクスポートする
@@ -120,9 +120,10 @@
 #### 受け入れ基準（Acceptance Criteria）
 
 1. THE App SHALL すべての生成ファイルの名前に日時（`yyyyMMdd_HHmmss` 形式）を使用する
-2. THE AudioCaptureService SHALL 録音ファイルを `system_audio_yyyyMMdd_HHmmss.wav` として保存する
-3. THE App SHALL 文字起こし結果を `transcript_yyyyMMdd_HHmmss.txt` として保存する
-4. THE App SHALL 要約結果を `summary_yyyyMMdd_HHmmss.txt` として保存する
+2. THE AudioCaptureService SHALL 録音ファイルを `yyyyMMdd_HHmmss.wav` として保存する（プレフィックスなし）
+3. THE ExportManager SHALL 文字起こし結果を `{音声ファイル名}.transcript.txt` として保存する（音声ファイル名ベース）
+4. THE ExportManager SHALL 要約結果を `{音声ファイル名}.summary.txt` として保存する（音声ファイル名ベース）
+5. THE App SHALL ファイルから要約の場合、`{読み込みファイル名}.summary.txt` として保存する
 
 ### 要件 9: CPU・メモリ使用状況の表示（System Resource Monitoring）
 
@@ -175,7 +176,51 @@
 3. THE App SHALL コピーボタンにFontIcon &#xE8C8; アイコンを使用する
 4. THE App SHALL 翻訳ボタンにFontIcon &#xE8C3; アイコンを使用する
 
-### 要件 13: アプリアイコン（Application Icon）
+### 要件 13: 文字起こし言語選択（Transcription Language Selection）
+
+**ユーザーストーリー:** ユーザーとして、文字起こしの言語を選択したい。それにより、精度の高い文字起こし結果を得られるようにしたい。
+
+#### 受け入れ基準（Acceptance Criteria）
+
+1. THE App SHALL TranscriptionLanguage列挙型で21言語＋自動判別（Auto）を定義する（日本語、英語、中国語、韓国語、フランス語、ドイツ語、スペイン語、ポルトガル語、イタリア語、ヒンディー語、アラビア語、ロシア語、トルコ語、オランダ語、スウェーデン語、ポーランド語、タイ語、インドネシア語、ベトナム語、マレー語）
+2. THE App SHALL 「文字起こし＋要約」ボタンの横にTranscriptionLangComboを配置し、言語を選択できるようにする
+3. WHEN 「自動判別」が選択された場合、THE TranscribeClient SHALL `IdentifyLanguage=true` を使用して言語を自動判別する
+4. THE App SHALL バッチ文字起こしとリアルタイム文字起こしの両方でTranscriptionLanguageを使用する
+
+### 要件 14: テキストクリア動作（Text Clearing Behavior）
+
+**ユーザーストーリー:** ユーザーとして、新しい操作を開始したときに前回の結果が自動的にクリアされてほしい。
+
+#### 受け入れ基準（Acceptance Criteria）
+
+1. WHEN 文字起こしが開始された場合、THE App SHALL Transcript、Summary、およびそれぞれの翻訳テキストをクリアする
+2. WHEN Transcriptが設定またはクリアされた場合、THE App SHALL 文字起こし翻訳テキストをクリアする
+3. WHEN 要約が開始された場合、THE App SHALL Summaryおよび要約翻訳テキストをクリアする
+4. WHEN 録音が開始された場合、THE App SHALL すべてのテキスト（リアルタイム、文字起こし、要約、各翻訳）をクリアする
+
+### 要件 15: ボタン状態管理（Button State Management）
+
+**ユーザーストーリー:** ユーザーとして、操作できないボタンが無効化されていてほしい。
+
+#### 受け入れ基準（Acceptance Criteria）
+
+1. THE App SHALL 「文字起こし＋要約」ボタンを、音声ファイル未選択時または文字起こし中に無効化する
+2. THE App SHALL 「ファイルから要約」「要約」ボタンを、文字起こし中または要約中に無効化する
+3. THE App SHALL コピーボタンを、対応するテキストが空の場合に無効化する
+4. THE App SHALL 翻訳ボタンを、ソーステキストが空の場合に無効化する
+5. THE App SHALL 要約中にProgressRingを表示する
+
+### 要件 16: テキストエリアの高さ統一とリサイズ（Text Area Height and Resize）
+
+**ユーザーストーリー:** ユーザーとして、テキストエリアの高さが統一され、ウィンドウサイズに応じて調整されてほしい。
+
+#### 受け入れ基準（Acceptance Criteria）
+
+1. THE App SHALL すべてのテキストエリアの初期高さを150pxに統一する
+2. THE App SHALL SizeChangedハンドラでウィンドウリサイズ時にテキストエリアの高さを動的に調整する
+3. THE App SHALL テキストエリアの最小高さを150pxとする
+
+### 要件 17: アプリアイコン（Application Icon）
 
 **ユーザーストーリー:** ユーザーとして、タスクバーやウィンドウタイトルでアプリを視覚的に識別したい。それにより、他のアプリケーションと区別しやすくしたい。
 

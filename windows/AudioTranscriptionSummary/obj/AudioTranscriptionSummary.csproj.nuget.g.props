@@ -25,5 +25,6 @@
     <PkgAWSSDK_TranscribeStreaming Condition=" '$(PkgAWSSDK_TranscribeStreaming)' == '' ">C:\Users\inadati\.nuget\packages\awssdk.transcribestreaming\4.0.6.8</PkgAWSSDK_TranscribeStreaming>
     <PkgAWSSDK_TranscribeService Condition=" '$(PkgAWSSDK_TranscribeService)' == '' ">C:\Users\inadati\.nuget\packages\awssdk.transcribeservice\4.0.5.12</PkgAWSSDK_TranscribeService>
     <PkgAWSSDK_S3 Condition=" '$(PkgAWSSDK_S3)' == '' ">C:\Users\inadati\.nuget\packages\awssdk.s3\4.0.20.3</PkgAWSSDK_S3>
+    <PkgAWSSDK_BedrockRuntime Condition=" '$(PkgAWSSDK_BedrockRuntime)' == '' ">C:\Users\inadati\.nuget\packages\awssdk.bedrockruntime\4.0.17.1</PkgAWSSDK_BedrockRuntime>
   </PropertyGroup>
 </Project>

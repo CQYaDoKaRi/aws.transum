@@ -1,9 +1,10 @@
 {
   "version": 2,
-  "dgSpecHash": "zQNPM0JoAMg=",
+  "dgSpecHash": "2kK9HK3RT3w=",
   "success": true,
   "projectFilePath": "C:\\Users\\inadati\\OneDrive - amazon.com\\ドキュメント\\dev\\windows\\AudioTranscriptionSummary\\AudioTranscriptionSummary.csproj",
   "expectedPackageFiles": [
+    "C:\\Users\\inadati\\.nuget\\packages\\awssdk.bedrockruntime\\4.0.17.1\\awssdk.bedrockruntime.4.0.17.1.nupkg.sha512",
     "C:\\Users\\inadati\\.nuget\\packages\\awssdk.core\\4.0.3.27\\awssdk.core.4.0.3.27.nupkg.sha512",
     "C:\\Users\\inadati\\.nuget\\packages\\awssdk.s3\\4.0.20.3\\awssdk.s3.4.0.20.3.nupkg.sha512",
     "C:\\Users\\inadati\\.nuget\\packages\\awssdk.transcribeservice\\4.0.5.12\\awssdk.transcribeservice.4.0.5.12.nupkg.sha512",
@@ -11,6 +12,7 @@
     "C:\\Users\\inadati\\.nuget\\packages\\awssdk.translate\\4.0.1.23\\awssdk.translate.4.0.1.23.nupkg.sha512",
     "C:\\Users\\inadati\\.nuget\\packages\\communitytoolkit.mvvm\\8.4.2\\communitytoolkit.mvvm.8.4.2.nupkg.sha512",
     "C:\\Users\\inadati\\.nuget\\packages\\microsoft.web.webview2\\1.0.2651.64\\microsoft.web.webview2.1.0.2651.64.nupkg.sha512",
+    "C:\\Users\\inadati\\.nuget\\packages\\microsoft.win32.systemevents\\8.0.0\\microsoft.win32.systemevents.8.0.0.nupkg.sha512",
     "C:\\Users\\inadati\\.nuget\\packages\\microsoft.windows.sdk.buildtools\\10.0.26100.7705\\microsoft.windows.sdk.buildtools.10.0.26100.7705.nupkg.sha512",
     "C:\\Users\\inadati\\.nuget\\packages\\microsoft.windowsappsdk\\1.6.250602001\\microsoft.windowsappsdk.1.6.250602001.nupkg.sha512",
     "C:\\Users\\inadati\\.nuget\\packages\\naudio\\2.3.0\\naudio.2.3.0.nupkg.sha512",
@@ -20,6 +22,7 @@
     "C:\\Users\\inadati\\.nuget\\packages\\naudio.wasapi\\2.3.0\\naudio.wasapi.2.3.0.nupkg.sha512",
     "C:\\Users\\inadati\\.nuget\\packages\\naudio.winforms\\2.3.0\\naudio.winforms.2.3.0.nupkg.sha512",
     "C:\\Users\\inadati\\.nuget\\packages\\naudio.winmm\\2.3.0\\naudio.winmm.2.3.0.nupkg.sha512",
+    "C:\\Users\\inadati\\.nuget\\packages\\system.drawing.common\\8.0.25\\system.drawing.common.8.0.25.nupkg.sha512",
     "C:\\Users\\inadati\\.nuget\\packages\\microsoft.netcore.app.runtime.win-x86\\8.0.25\\microsoft.netcore.app.runtime.win-x86.8.0.25.nupkg.sha512",
     "C:\\Users\\inadati\\.nuget\\packages\\microsoft.netcore.app.runtime.win-x64\\8.0.25\\microsoft.netcore.app.runtime.win-x64.8.0.25.nupkg.sha512",
     "C:\\Users\\inadati\\.nuget\\packages\\microsoft.netcore.app.runtime.win-arm64\\8.0.25\\microsoft.netcore.app.runtime.win-arm64.8.0.25.nupkg.sha512",

@@ -2,9 +2,16 @@
 // Amazon Bedrock（Claude）を使用した生成型要約サービス
 // AWS 認証情報未設定時はローカル抽出型要約にフォールバック
 
+using System;
+using System.Collections.Generic;
+using System.Linq;
 using System.Text.Json;
+using System.Text.RegularExpressions;
+using System.Threading.Tasks;
+using Amazon;
 using Amazon.BedrockRuntime;
 using Amazon.BedrockRuntime.Model;
+using Amazon.Runtime;
 using AudioTranscriptionSummary.Models;
 
 namespace AudioTranscriptionSummary.Services;
@@ -33,29 +40,39 @@ public class Summarizer
             try
             {
                 var summaryText = await SummarizeWithBedrockAsync(transcript.Text, additionalPrompt, settings);
-                return new Summary
-                {
-                    Id = Guid.NewGuid().ToString(),
-                    TranscriptId = transcript.Id,
-                    Text = summaryText,
-                    CreatedAt = DateTime.UtcNow
-                };
+                return new Summary(
+                    Id: Guid.NewGuid(),
+                    TranscriptId: transcript.Id,
+                    Text: summaryText,
+                    CreatedAt: DateTime.UtcNow
+                );
             }
-            catch
+            catch (Exception ex)
             {
-                // フォールバック
+                var modelId = string.IsNullOrEmpty(settings.BedrockModelId)
+                    ? BedrockModel.DefaultModelId : settings.BedrockModelId;
+                var logModel = BedrockModel.Find(modelId);
+                ErrorLogger.SaveErrorLog(ex, "Bedrock要約失敗_フォールバック", new Dictionary<string, string>
+                {
+                    ["modelId"] = modelId,
+                    ["inferenceId"] = logModel?.GetInferenceId(settings.Region) ?? modelId,
+                    ["region"] = settings.Region,
+                    ["textLength"] = transcript.Text.Length.ToString(),
+                    ["additionalPrompt"] = additionalPrompt ?? "",
+                    ["detail"] = ex.ToString()
+                });
+                // フォールバック: ローカル要約を実行（エラーは呼び出し元に伝播しない）
             }
         }
 
         // ローカル抽出型要約
         var localSummary = LocalExtractSummary(transcript.Text);
-        return new Summary
-        {
-            Id = Guid.NewGuid().ToString(),
-            TranscriptId = transcript.Id,
-            Text = localSummary,
-            CreatedAt = DateTime.UtcNow
-        };
+        return new Summary(
+            Id: Guid.NewGuid(),
+            TranscriptId: transcript.Id,
+            Text: localSummary,
+            CreatedAt: DateTime.UtcNow
+        );
     }
 
     private async Task<string> SummarizeWithBedrockAsync(string text, string additionalPrompt, AppSettings settings)
@@ -70,6 +87,10 @@ public class Summarizer
             ? BedrockModel.DefaultModelId
             : settings.BedrockModelId;
 
+        // Cross-Region inference profile IDを使用（on-demand throughput対応）
+        var model = BedrockModel.Find(modelId);
+        var inferenceId = model?.GetInferenceId(settings.Region) ?? modelId;
+
         var prompt = "以下のテキストを簡潔に要約してください。要約は元のテキストの言語で出力してください。箇条書きではなく、自然な文章で要約してください。";
         if (!string.IsNullOrWhiteSpace(additionalPrompt))
             prompt += $"\n\n追加の指示:\n{additionalPrompt}";
@@ -77,7 +98,7 @@ public class Summarizer
 
         var request = new ConverseRequest
         {
-            ModelId = modelId,
+            ModelId = inferenceId,
             Messages =
             [
                 new Message

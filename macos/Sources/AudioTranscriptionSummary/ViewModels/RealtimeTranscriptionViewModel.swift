@@ -76,8 +76,14 @@ class RealtimeTranscriptionViewModel: ObservableObject {
                 }
                 // ストリーム出力: 確定テキストをファイルに逐次追記
                 self.appendToStreamFile(text + "\n")
-                // 確定テキストをリアルタイム翻訳
-                await self.realtimeTranslationVM?.translateAppend(text)
+                // 確定テキストをリアルタイム翻訳（検出言語と翻訳先言語が異なる場合のみ）
+                if let vm = self.realtimeTranslationVM {
+                    let targetLang = vm.selectedTargetLanguage.rawValue
+                    let detectedPrefix = self.detectedLanguage?.prefix(2).lowercased() ?? ""
+                    if detectedPrefix != targetLang {
+                        await vm.translateAppend(text)
+                    }
+                }
             }
         }
 

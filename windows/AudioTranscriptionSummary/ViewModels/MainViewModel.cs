@@ -418,11 +418,17 @@ public partial class MainViewModel : ObservableObject
             _dispatcherQueue.TryEnqueue(async () =>
             {
                 RealtimeTranscriptionVM.AppendFinalTranscript(text);
-                // リアルタイム翻訳: FinalText全体を翻訳
+                // リアルタイム翻訳: 検出言語と翻訳先言語が異なる場合のみ実行
                 var fullText = RealtimeTranscriptionVM.FinalText;
                 if (!string.IsNullOrWhiteSpace(fullText))
                 {
-                    await RealtimeTranslationVM.TranslateCommand.ExecuteAsync(fullText);
+                    var detected = RealtimeTranscriptionVM.DetectedLanguage ?? "";
+                    var detectedPrefix = detected.Length >= 2 ? detected[..2].ToLower() : "";
+                    var targetCode = RealtimeTranslationVM.SelectedTargetLanguage.ToCode();
+                    if (detectedPrefix != targetCode)
+                    {
+                        await RealtimeTranslationVM.TranslateCommand.ExecuteAsync(fullText);
+                    }
                 }
             });
         };

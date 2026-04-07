@@ -39,6 +39,9 @@ class TranslationViewModel: ObservableObject {
         await translate(text)
     }
 
+    /// 表示テキストの最大行数
+    private let maxDisplayLines = 500
+
     /// リアルタイム翻訳: 確定テキストを追記翻訳する
     func translateAppend(_ text: String) async {
         guard !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return }
@@ -52,10 +55,20 @@ class TranslationViewModel: ObservableObject {
                 region: AWSSettingsViewModel.currentRegion
             )
             translatedText += translated + "\n"
+            translatedText = trimToMaxLines(translatedText)
         } catch {
             errorMessage = "翻訳エラー: \(error.localizedDescription)"
         }
         isTranslating = false
+    }
+
+    /// テキストを最大行数に制限する（超過分は先頭から削除）
+    private func trimToMaxLines(_ text: String) -> String {
+        let lines = text.components(separatedBy: "\n")
+        if lines.count > maxDisplayLines {
+            return lines.suffix(maxDisplayLines).joined(separator: "\n")
+        }
+        return text
     }
 
     /// 状態をリセットする

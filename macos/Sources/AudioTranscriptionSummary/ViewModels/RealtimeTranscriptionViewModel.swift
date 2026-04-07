@@ -37,8 +37,20 @@ class RealtimeTranscriptionViewModel: ObservableObject {
     /// リアルタイム翻訳用の TranslationViewModel（外部から設定）
     var realtimeTranslationVM: TranslationViewModel?
 
+    /// 表示テキストの最大行数
+    private let maxDisplayLines = 500
+
     /// リアルタイム文字起こしのストリーム出力先ファイルパス
     var streamOutputPath: URL?
+
+    /// テキストを最大行数に制限する（超過分は先頭から削除）
+    private func trimToMaxLines(_ text: String) -> String {
+        let lines = text.components(separatedBy: "\n")
+        if lines.count > maxDisplayLines {
+            return lines.suffix(maxDisplayLines).joined(separator: "\n")
+        }
+        return text
+    }
 
     // MARK: - ストリーミング開始
 
@@ -70,6 +82,7 @@ class RealtimeTranscriptionViewModel: ObservableObject {
             Task { @MainActor [weak self] in
                 guard let self = self else { return }
                 self.finalText += text + "\n"
+                self.finalText = self.trimToMaxLines(self.finalText)
                 self.partialText = ""
                 if let lang = lang {
                     self.detectedLanguage = lang

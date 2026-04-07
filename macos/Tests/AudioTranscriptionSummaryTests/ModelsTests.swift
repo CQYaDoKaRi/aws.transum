@@ -24,7 +24,20 @@ struct TranscriptionLanguageTests {
     @Test func initFromRawValue() {
         #expect(TranscriptionLanguage(rawValue: "ja-JP") == .japanese)
         #expect(TranscriptionLanguage(rawValue: "en-US") == .english)
-        #expect(TranscriptionLanguage(rawValue: "fr-FR") == nil)
+        #expect(TranscriptionLanguage(rawValue: "fr-FR") == .french)
+        #expect(TranscriptionLanguage(rawValue: "invalid") == nil)
+    }
+
+    /// auto の displayName が「言語自動判定」であることを確認
+    @Test func autoDisplayName() {
+        #expect(TranscriptionLanguage.auto.displayName == "言語自動判定")
+    }
+
+    /// selectedLanguage のデフォルト値が .auto であることを確認
+    @Test func defaultSelectedLanguage() async {
+        let vm = await RealtimeTranscriptionViewModel()
+        let lang = await vm.selectedLanguage
+        #expect(lang == .auto)
     }
 }
 

@@ -17,13 +17,13 @@ struct TranscriptView: View {
         VStack(alignment: .leading, spacing: 12) {
             // ツールバー
             HStack {
-                Picker("言語", selection: $selectedLanguage) {
+                Picker("", selection: $selectedLanguage) {
                     ForEach(TranscriptionLanguage.allCases) { lang in
                         Text(lang.displayName).tag(lang)
                     }
                 }
                 .pickerStyle(.menu)
-                .frame(width: 140)
+                .frame(width: 160)
 
                 Spacer()
 
@@ -37,8 +37,8 @@ struct TranscriptView: View {
                 }
                 .disabled(viewModel.audioFile == nil || isProcessing)
             }
-            .padding(.horizontal)
-            .padding(.top, 12)
+            .padding(.horizontal, 8)
+            .padding(.top, 8)
 
             Divider()
 

@@ -21,8 +21,8 @@ class RealtimeTranscriptionViewModel: ObservableObject {
     @Published var detectedLanguage: String?
     /// 翻訳先言語
     @Published var selectedTargetLanguage: TranslationLanguage = .japanese
-    /// 言語自動判別の有効/無効
-    @Published var isAutoDetectEnabled: Bool = true
+    /// 文字起こし言語（auto = 自動検出、それ以外 = 指定言語）
+    @Published var selectedLanguage: TranscriptionLanguage = .auto
     /// リアルタイム文字起こしの有効/無効
     @Published var isRealtimeEnabled: Bool = true
     /// ストリーミング中かどうか
@@ -30,9 +30,15 @@ class RealtimeTranscriptionViewModel: ObservableObject {
     /// エラーメッセージ
     @Published var errorMessage: String?
 
+    // MARK: - 自動検出時の言語候補
+
+    /// 自動検出モードで使用する言語候補（Transcribe Streaming は最大5言語）
+    static let autoDetectLanguageOptions = ["ja-JP", "en-US", "zh-CN", "ko-KR", "fr-FR"]
+
     // MARK: - サービス
 
-    private let transcribeClient = RealtimeTranscribeClient()
+    /// リアルタイム文字起こしクライアント（DI 対応: プロトコル型）
+    private let transcribeClient: RealtimeTranscribing
 
     /// リアルタイム翻訳用の TranslationViewModel（外部から設定）
     var realtimeTranslationVM: TranslationViewModel?
@@ -43,6 +49,18 @@ class RealtimeTranscriptionViewModel: ObservableObject {
     /// リアルタイム文字起こしのストリーム出力先ファイルパス
     var streamOutputPath: URL?
 
+    // MARK: - イニシャライザ
+
+    /// デフォルトイニシャライザ（本番用: RealtimeTranscribeClient を使用）
+    init() {
+        self.transcribeClient = RealtimeTranscribeClient()
+    }
+
+    /// DI 用イニシャライザ（テスト時にモックを注入可能）
+    init(transcribeClient: RealtimeTranscribing) {
+        self.transcribeClient = transcribeClient
+    }
+
     /// テキストを最大行数に制限する（超過分は先頭から削除）
     private func trimToMaxLines(_ text: String) -> String {
         let lines = text.components(separatedBy: "\n")
@@ -50,6 +68,53 @@ class RealtimeTranscriptionViewModel: ObservableObject {
             return lines.suffix(maxDisplayLines).joined(separator: "\n")
         }
         return text
+    }
+
+    // MARK: - コールバック設定
+
+    /// transcribeClient のコールバックを設定する
+    private func setupCallbacks() {
+        transcribeClient.onPartialTranscript = { [weak self] text in
+            Task { @MainActor [weak self] in
+                self?.partialText = text
+            }
+        }
+
+        transcribeClient.onFinalTranscript = { [weak self] text, lang in
+            Task { @MainActor [weak self] in
+                guard let self = self else { return }
+                self.finalText += text + "\n"
+                self.finalText = self.trimToMaxLines(self.finalText)
+                self.partialText = ""
+                if let lang = lang {
+                    self.detectedLanguage = lang
+                }
+                // ストリーム出力: 確定テキストをファイルに逐次追記
+                self.appendToStreamFile(text + "\n")
+                // 確定テキストをリアルタイム翻訳（文字起こし言語と翻訳先言語が異なる場合のみ）
+                if let vm = self.realtimeTranslationVM {
+                    let targetLang = vm.selectedTargetLanguage.rawValue
+                    // 文字起こし言語を判定（指定言語 or 検出言語）
+                    let transcribeLangPrefix: String
+                    if self.selectedLanguage != .auto {
+                        // 指定言語モード: selectedLanguage のプレフィックス（例: "ja-JP" → "ja"）
+                        transcribeLangPrefix = String(self.selectedLanguage.rawValue.prefix(2)).lowercased()
+                    } else {
+                        // 自動検出モード: 検出された言語のプレフィックス
+                        transcribeLangPrefix = self.detectedLanguage?.prefix(2).lowercased() ?? ""
+                    }
+                    if !transcribeLangPrefix.isEmpty && transcribeLangPrefix != targetLang {
+                        await vm.translateAppend(text)
+                    }
+                }
+            }
+        }
+
+        transcribeClient.onError = { [weak self] error in
+            Task { @MainActor [weak self] in
+                self?.errorMessage = "リアルタイム文字起こしエラー: \(error.localizedDescription)"
+            }
+        }
     }
 
     // MARK: - ストリーミング開始
@@ -72,52 +137,29 @@ class RealtimeTranscriptionViewModel: ObservableObject {
         isStreaming = true
 
         // コールバック設定
-        transcribeClient.onPartialTranscript = { [weak self] text in
-            Task { @MainActor [weak self] in
-                self?.partialText = text
-            }
-        }
+        setupCallbacks()
 
-        transcribeClient.onFinalTranscript = { [weak self] text, lang in
-            Task { @MainActor [weak self] in
-                guard let self = self else { return }
-                self.finalText += text + "\n"
-                self.finalText = self.trimToMaxLines(self.finalText)
-                self.partialText = ""
-                if let lang = lang {
-                    self.detectedLanguage = lang
-                }
-                // ストリーム出力: 確定テキストをファイルに逐次追記
-                self.appendToStreamFile(text + "\n")
-                // 確定テキストをリアルタイム翻訳（検出言語と翻訳先言語が異なる場合のみ）
-                if let vm = self.realtimeTranslationVM {
-                    let targetLang = vm.selectedTargetLanguage.rawValue
-                    let detectedPrefix = self.detectedLanguage?.prefix(2).lowercased() ?? ""
-                    if detectedPrefix != targetLang {
-                        await vm.translateAppend(text)
-                    }
-                }
-            }
-        }
+        // 内部ストリーミング開始
+        await startStreamingInternal()
+    }
 
-        transcribeClient.onError = { [weak self] error in
-            Task { @MainActor [weak self] in
-                self?.errorMessage = "リアルタイム文字起こしエラー: \(error.localizedDescription)"
-            }
-        }
+    // MARK: - 内部ストリーミング開始
 
-        // ストリーミング開始
+    /// selectedLanguage に基づいてストリーミングを開始する（再接続時にも使用）
+    private func startStreamingInternal() async {
         let region = AWSSettingsViewModel.currentRegion
         do {
-            if isAutoDetectEnabled {
+            if selectedLanguage == .auto {
+                // 自動検出: 主要言語を languageOptions に渡す
                 try await transcribeClient.startStreaming(
                     languageCode: nil,
-                    autoDetectLanguages: ["ja-JP", "en-US"],
+                    autoDetectLanguages: Self.autoDetectLanguageOptions,
                     region: region
                 )
             } else {
+                // 指定言語: 選択された言語コードを使用
                 try await transcribeClient.startStreaming(
-                    languageCode: "ja-JP",
+                    languageCode: selectedLanguage.rawValue,
                     autoDetectLanguages: nil,
                     region: region
                 )
@@ -126,6 +168,27 @@ class RealtimeTranscriptionViewModel: ObservableObject {
             errorMessage = "ストリーミング開始に失敗しました: \(error.localizedDescription)"
             isStreaming = false
         }
+    }
+
+    // MARK: - ストリーミング中の言語切り替え
+
+    /// 言語設定変更時にストリーミングを再接続する
+    /// - 確定テキスト（finalText）は保持
+    /// - 暫定テキスト（partialText）はクリア
+    func restartStreamingWithNewLanguage() async {
+        guard isStreaming else { return }
+
+        // 現在のストリーミングを停止
+        transcribeClient.stopStreaming()
+        // 暫定テキストをクリア（確定テキストは保持）
+        partialText = ""
+        errorMessage = nil
+
+        // コールバックを再設定
+        setupCallbacks()
+
+        // 新しい言語設定でストリーミング再開
+        await startStreamingInternal()
     }
 
     // MARK: - ストリーミング停止

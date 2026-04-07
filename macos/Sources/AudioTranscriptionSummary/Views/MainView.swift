@@ -107,7 +107,69 @@ struct MainView: View {
     private var inputArea: some View {
         VStack(spacing: 0) {
             collapsibleSection(title: "入力", icon: "square.and.arrow.down", isExpanded: $isInputExpanded) {
-                SystemAudioCaptureView(viewModel: viewModel)
+                VStack(spacing: 8) {
+                    HStack {
+                        // 音源選択 Picker
+                        Picker("", selection: $viewModel.selectedAudioSource) {
+                            ForEach(viewModel.availableAudioSources) { source in
+                                Label(source.displayName, systemImage: source.iconName).tag(source)
+                            }
+                        }
+                        .disabled(viewModel.isCapturingSystemAudio || viewModel.isRecordingScreen)
+                        .onChange(of: viewModel.selectedAudioSource) { _, newSource in
+                            if !newSource.isScreenRecording {
+                                Task { await viewModel.startLevelPreview() }
+                            } else {
+                                Task { await viewModel.stopLevelPreview() }
+                            }
+                        }
+
+                        // リアルタイム文字起こしトグル（スイッチ左、ラベル右）
+                        Toggle(isOn: $awsSettingsViewModel.isRealtimeEnabled) {
+                            EmptyView()
+                        }
+                        .toggleStyle(.switch)
+                        .controlSize(.small)
+                        .labelsHidden()
+                        Text("リアルタイム文字起こし")
+                            .font(.caption)
+                            .onChange(of: awsSettingsViewModel.isRealtimeEnabled) { _, enabled in
+                                awsSettingsViewModel.saveRealtimeSetting()
+                                if enabled {
+                                    withAnimation(.easeInOut(duration: 0.2)) {
+                                        isRealtimeExpanded = true
+                                        isTranscriptExpanded = false
+                                        isSummaryExpanded = false
+                                    }
+                                } else {
+                                    withAnimation(.easeInOut(duration: 0.2)) {
+                                        isRealtimeExpanded = false
+                                        isTranscriptExpanded = true
+                                        isSummaryExpanded = true
+                                    }
+                                    realtimeVM.stopStreaming()
+                                }
+                            }
+                    }
+
+                    // レベルメーター（画面録画以外）
+                    if !viewModel.selectedAudioSource.isScreenRecording {
+                        levelGauge(level: (viewModel.isCapturingSystemAudio || viewModel.isRecordingScreen) ? viewModel.captureAudioLevel : viewModel.previewAudioLevel)
+                    }
+
+                    // 画面プレビュー（画面録画中のみ）
+                    if viewModel.isRecordingScreen, let frame = viewModel.screenPreviewFrame {
+                        Image(decorative: frame, scale: 1.0)
+                            .resizable()
+                            .aspectRatio(contentMode: .fit)
+                            .frame(maxHeight: 100)
+                            .clipShape(RoundedRectangle(cornerRadius: 4))
+                            .overlay(RoundedRectangle(cornerRadius: 4).strokeBorder(.red.opacity(0.5), lineWidth: 1))
+                    }
+                }
+                .padding(4)
+                .background(RoundedRectangle(cornerRadius: 8).fill(Color(.controlBackgroundColor)))
+                .task { await viewModel.refreshAudioSources() }
             } statusContent: {
                 if viewModel.isCapturingSystemAudio {
                     Circle().fill(.red).frame(width: 6, height: 6)
@@ -135,13 +197,8 @@ struct MainView: View {
                         }
                         .frame(minHeight: 100)
                     } statusContent: {
-                        // 言語判定ラベルのみ
-                        if let lang = realtimeVM.detectedLanguage {
-                            Text(lang).font(.caption2)
-                                .padding(.horizontal, 5).padding(.vertical, 1)
-                                .background(Color.blue.opacity(0.15))
-                                .clipShape(RoundedRectangle(cornerRadius: 3))
-                        }
+                        // 検出言語ラベルは TranscriptionPreviewPanel 内に移動済み
+                        EmptyView()
                     }
                     Divider()
                 }
@@ -168,13 +225,22 @@ struct MainView: View {
                 Divider()
                 collapsibleSection(title: "要約", icon: "doc.text", isExpanded: $isSummaryExpanded) {
                     VStack(spacing: 0) {
-                        // 基盤モデル表示 + プロンプト + ボタン
+                        // 基盤モデル選択 + プロンプト + ボタン
                         VStack(alignment: .leading, spacing: 4) {
-                            // 利用する基盤モデル表示
+                            // 基盤モデル Picker（左寄せ）
                             HStack(spacing: 4) {
-                                Image(systemName: "cpu").font(.caption2).foregroundStyle(.secondary)
-                                Text(BedrockModel.find(by: viewModel.awsSettingsBedrockModelId)?.name ?? "ローカル要約")
-                                    .font(.caption2).foregroundStyle(.secondary)
+                                Picker("", selection: $awsSettingsViewModel.bedrockModelId) {
+                                    ForEach(BedrockModel.availableModels(for: awsSettingsViewModel.region)) { model in
+                                        Text("\(model.name)").tag(model.id)
+                                    }
+                                }
+                                .pickerStyle(.menu)
+                                .frame(width: 200)
+                                .disabled(viewModel.isSummarizing)
+                                .onChange(of: awsSettingsViewModel.bedrockModelId) { _, _ in
+                                    awsSettingsViewModel.saveBedrockModelSetting()
+                                }
+                                Spacer()
                             }
                             .padding(.horizontal, 8).padding(.top, 4)
 
@@ -270,6 +336,19 @@ struct MainView: View {
     }
 
     // MARK: - 録音状態変更
+
+    private func levelGauge(level: Float) -> some View {
+        GeometryReader { geo in
+            ZStack(alignment: .leading) {
+                RoundedRectangle(cornerRadius: 2).fill(Color(.separatorColor).opacity(0.3))
+                RoundedRectangle(cornerRadius: 2)
+                    .fill(level > 0.8 ? .red : level > 0.5 ? .yellow : .green)
+                    .frame(width: geo.size.width * CGFloat(level))
+                    .animation(.easeOut(duration: 0.1), value: level)
+            }
+        }
+        .frame(height: 6)
+    }
 
     private func handleCaptureChange(_ capturing: Bool) {
         if capturing {

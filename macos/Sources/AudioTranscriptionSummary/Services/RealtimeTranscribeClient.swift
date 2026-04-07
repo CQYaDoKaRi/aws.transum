@@ -8,7 +8,7 @@ import AWSTranscribeStreaming
 // MARK: - RealtimeTranscribeClient
 
 /// Amazon Transcribe Streaming API を使用したリアルタイム文字起こしクライアント
-final class RealtimeTranscribeClient: @unchecked Sendable {
+final class RealtimeTranscribeClient: @unchecked Sendable, RealtimeTranscribing {
 
     // MARK: - コールバック
 

@@ -49,6 +49,26 @@ public sealed partial class MainPage : Page
                 _vm.SelectedTranscriptionLanguage = transcriptionLangs[TranscriptionLangCombo.SelectedIndex];
         };
 
+        // Populate realtime transcription language ComboBox
+        foreach (var lang in transcriptionLangs)
+            RealtimeLangCombo.Items.Add(lang.ToDisplayName());
+        RealtimeLangCombo.SelectedIndex = 0; // Auto
+        RealtimeLangCombo.SelectionChanged += (_, _) =>
+        {
+            if (RealtimeLangCombo.SelectedIndex >= 0)
+            {
+                var selected = transcriptionLangs[RealtimeLangCombo.SelectedIndex];
+                _vm.RealtimeTranscriptionVM.SelectedRealtimeLanguage = selected;
+                // 自動検出時のみ再判別ボタンと検出言語ラベルを表示
+                RedetectLangBtn.Visibility = selected == TranscriptionLanguage.Auto
+                    ? Visibility.Visible : Visibility.Collapsed;
+                if (selected != TranscriptionLanguage.Auto)
+                    LanguageBadge.Visibility = Visibility.Collapsed;
+                // ストリーミング中なら再接続
+                _ = _vm.RestartRealtimeStreamingAsync();
+            }
+        };
+
         // Sync ComboBox selection to ViewModels
         RealtimeTranslateLang.SelectionChanged += (_, _) =>
         {
@@ -80,11 +100,12 @@ public sealed partial class MainPage : Page
 
         // Task 7.1: Hide realtime section when disabled
         var settings = new SettingsStore().Load();
+        RealtimeToggle.IsOn = settings.IsRealtimeEnabled;
         RealtimeSection.Visibility = settings.IsRealtimeEnabled
             ? Visibility.Visible : Visibility.Collapsed;
 
-        // Bedrock モデルラベル更新
-        UpdateBedrockModelLabel(settings);
+        // Bedrock モデル ComboBox 初期化
+        InitializeBedrockModelCombo(settings);
 
         // 初期状態: 音声ファイル未選択なので文字起こしボタン無効
         TranscribeButton.IsEnabled = false;
@@ -177,7 +198,8 @@ public sealed partial class MainPage : Page
                     break;
                 case nameof(RealtimeTranscriptionViewModel.DetectedLanguage):
                     var lang = _vm.RealtimeTranscriptionVM.DetectedLanguage;
-                    if (!string.IsNullOrEmpty(lang))
+                    if (!string.IsNullOrEmpty(lang) &&
+                        _vm.RealtimeTranscriptionVM.SelectedRealtimeLanguage == TranscriptionLanguage.Auto)
                     {
                         LanguageBadgeText.Text = lang;
                         LanguageBadge.Visibility = Visibility.Visible;
@@ -356,8 +378,7 @@ public sealed partial class MainPage : Page
             if (f != null) exportDirBox.Text = f.Path;
         };
 
-        var realtimeToggle = new ToggleSwitch { Header = "リアルタイム文字起こし", IsOn = settings.IsRealtimeEnabled, Margin = new Thickness(0, 0, 0, 8) };
-        var autoDetectToggle = new ToggleSwitch { Header = "言語自動判別", IsOn = settings.IsAutoDetectEnabled, Margin = new Thickness(0, 0, 0, 8) };
+        // リアルタイム設定・要約設定は設定画面から削除済み（メイン画面で管理）
 
         // Connection test UI
         var connectionStatusText = new TextBlock
@@ -452,43 +473,6 @@ public sealed partial class MainPage : Page
         panel.Children.Add(exportDirBox);
         panel.Children.Add(exportDirBtn);
 
-        // グループ: リアルタイム設定
-        panel.Children.Add(CreateGroupLabel("🎙️ リアルタイム設定"));
-        panel.Children.Add(realtimeToggle);
-        panel.Children.Add(autoDetectToggle);
-
-        // グループ: 要約（Bedrock）
-        panel.Children.Add(CreateGroupLabel("🔍 要約（Bedrock）"));
-        var bedrockModelCombo = new ComboBox
-        {
-            Header = "基盤モデル",
-            HorizontalAlignment = HorizontalAlignment.Stretch,
-            Margin = new Thickness(0, 0, 0, 8)
-        };
-        var availableModels = BedrockModel.AvailableModels(settings.Region);
-        int selectedModelIdx = 0;
-        for (int i = 0; i < availableModels.Length; i++)
-        {
-            bedrockModelCombo.Items.Add(availableModels[i].DisplayName);
-            if (availableModels[i].Id == settings.BedrockModelId)
-                selectedModelIdx = i;
-        }
-        bedrockModelCombo.SelectedIndex = selectedModelIdx;
-
-        // リージョン変更時にモデルリストを更新
-        regionCombo.SelectionChanged += (_, _) =>
-        {
-            var newRegion = regionCombo.SelectedItem?.ToString() ?? "ap-northeast-1";
-            var models = BedrockModel.AvailableModels(newRegion);
-            bedrockModelCombo.Items.Clear();
-            foreach (var m in models)
-                bedrockModelCombo.Items.Add(m.DisplayName);
-            if (models.Length > 0)
-                bedrockModelCombo.SelectedIndex = 0;
-        };
-
-        panel.Children.Add(bedrockModelCombo);
-
         var dialog = new ContentDialog
         {
             Title = "設定",
@@ -508,23 +492,13 @@ public sealed partial class MainPage : Page
             settings.S3BucketName = s3Bucket.Text;
             settings.RecordingDirectoryPath = recordDirBox.Text;
             settings.ExportDirectoryPath = exportDirBox.Text;
-            settings.IsRealtimeEnabled = realtimeToggle.IsOn;
-            settings.IsAutoDetectEnabled = autoDetectToggle.IsOn;
-
-            // Bedrock モデル保存
-            var selectedRegion = regionCombo.SelectedItem?.ToString() ?? "ap-northeast-1";
-            var currentModels = BedrockModel.AvailableModels(selectedRegion);
-            if (bedrockModelCombo.SelectedIndex >= 0 && bedrockModelCombo.SelectedIndex < currentModels.Length)
-                settings.BedrockModelId = currentModels[bedrockModelCombo.SelectedIndex].Id;
 
             store.Save(settings);
 
             // Update realtime section visibility after settings change
+            RealtimeToggle.IsOn = settings.IsRealtimeEnabled;
             RealtimeSection.Visibility = settings.IsRealtimeEnabled
                 ? Visibility.Visible : Visibility.Collapsed;
-
-            // Update Bedrock model label
-            UpdateBedrockModelLabel(settings);
         }
     }
 
@@ -660,19 +634,55 @@ public sealed partial class MainPage : Page
 
     private void UpdateBedrockModelLabel(AppSettings settings)
     {
-        if (!string.IsNullOrEmpty(settings.AccessKeyId) && !string.IsNullOrEmpty(settings.SecretAccessKey))
+        // 基盤モデル ComboBox で管理するため不要
+    }
+
+    /// 基盤モデル ComboBox を初期化する
+    private void InitializeBedrockModelCombo(AppSettings settings)
+    {
+        var models = BedrockModel.AvailableModels(settings.Region);
+        BedrockModelCombo.Items.Clear();
+        int selectedIdx = 0;
+        for (int i = 0; i < models.Length; i++)
         {
-            var model = BedrockModel.Find(settings.BedrockModelId);
-            BedrockModelLabel.Text = model != null
-                ? $"Bedrock: {model.DisplayName}"
-                : $"Bedrock: {settings.BedrockModelId}";
-            BedrockModelLabel.Foreground = new Microsoft.UI.Xaml.Media.SolidColorBrush(
-                Microsoft.UI.ColorHelper.FromArgb(255, 0, 120, 212));
+            BedrockModelCombo.Items.Add(models[i].DisplayName);
+            if (models[i].Id == settings.BedrockModelId)
+                selectedIdx = i;
+        }
+        BedrockModelCombo.SelectedIndex = selectedIdx;
+
+        BedrockModelCombo.SelectionChanged += (_, _) =>
+        {
+            if (BedrockModelCombo.SelectedIndex >= 0 && BedrockModelCombo.SelectedIndex < models.Length)
+            {
+                var store = new SettingsStore();
+                var s = store.Load();
+                s.BedrockModelId = models[BedrockModelCombo.SelectedIndex].Id;
+                store.Save(s);
+            }
+        };
+    }
+
+    /// リアルタイム文字起こしトグル変更時
+    private void OnRealtimeToggled(object sender, RoutedEventArgs e)
+    {
+        var store = new SettingsStore();
+        var s = store.Load();
+        s.IsRealtimeEnabled = RealtimeToggle.IsOn;
+        store.Save(s);
+
+        if (RealtimeToggle.IsOn)
+        {
+            RealtimeSection.Visibility = Visibility.Visible;
+            RealtimeSection.IsExpanded = true;
+            TranscriptSection.IsExpanded = false;
+            SummarySection.IsExpanded = false;
         }
         else
         {
-            BedrockModelLabel.Text = "ローカル要約（AWS認証情報未設定）";
-            BedrockModelLabel.Foreground = new Microsoft.UI.Xaml.Media.SolidColorBrush(Microsoft.UI.Colors.Gray);
+            RealtimeSection.Visibility = Visibility.Collapsed;
+            TranscriptSection.IsExpanded = true;
+            SummarySection.IsExpanded = true;
         }
     }
 
@@ -694,6 +704,12 @@ public sealed partial class MainPage : Page
     {
         InputSection.IsExpanded = false;
         RealtimeSection.IsExpanded = false;
+    }
+
+    // リアルタイム文字起こし言語の再判別
+    private async void OnRedetectLanguageClick(object sender, RoutedEventArgs e)
+    {
+        await _vm.RestartRealtimeStreamingAsync();
     }
 
     // 「ファイルから要約」ボタン

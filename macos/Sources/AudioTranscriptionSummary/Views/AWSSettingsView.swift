@@ -128,49 +128,11 @@ struct AWSSettingsView: View {
                         Button(role: .destructive) { viewModel.deleteCredentials() } label: { Label("削除", systemImage: "trash") }
                             .buttonStyle(.bordered).disabled(!viewModel.isSaved)
                     }
-
-                    // リアルタイム設定
-                    settingsGroup(title: "リアルタイム文字起こし・翻訳", icon: "waveform.badge.mic") {
-                        Toggle("リアルタイム文字起こしを有効にする", isOn: $viewModel.isRealtimeEnabled)
-                        Toggle("言語自動判別を有効にする", isOn: $viewModel.isAutoDetectEnabled)
-                            .disabled(!viewModel.isRealtimeEnabled)
-                        settingsRow("デフォルト翻訳先言語") {
-                            Picker("", selection: $viewModel.defaultTargetLanguage) {
-                                ForEach(TranslationLanguage.allCases) { lang in Text(lang.displayName).tag(lang) }
-                            }
-                            .frame(width: 150)
-                        }
-                        .disabled(!viewModel.isRealtimeEnabled)
-                    }
-
-                    // 要約設定（Bedrock 基盤モデル選択）
-                    settingsGroup(title: "要約（Bedrock）", icon: "doc.text.magnifyingglass") {
-                        settingsRow("基盤モデル") {
-                            Picker("", selection: $viewModel.bedrockModelId) {
-                                ForEach(BedrockModel.availableModels(for: viewModel.region)) { model in
-                                    Text("\(model.name) (\(model.provider))").tag(model.id)
-                                }
-                            }
-                            .onChange(of: viewModel.bedrockModelId) { _, _ in
-                                // モデル変更時に即座に保存
-                                viewModel.saveCredentials()
-                            }
-                            .onChange(of: viewModel.region) { _, newRegion in
-                                let models = BedrockModel.availableModels(for: newRegion)
-                                if !models.contains(where: { $0.id == viewModel.bedrockModelId }),
-                                   let first = models.first {
-                                    viewModel.bedrockModelId = first.id
-                                }
-                                // リージョン変更時に即座に保存
-                                viewModel.saveCredentials()
-                            }
-                        }
-                    }
                 }
                 .padding()
             }
         }
-        .frame(minWidth: 550, minHeight: 650)
+        .frame(minWidth: 550, minHeight: 500)
         .onAppear {
             // sheet 内の TextField にフォーカスが当たるようにキーウィンドウを設定
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {

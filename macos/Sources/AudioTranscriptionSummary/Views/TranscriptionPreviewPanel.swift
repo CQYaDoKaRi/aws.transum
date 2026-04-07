@@ -1,5 +1,5 @@
 // TranscriptionPreviewPanel.swift
-// リアルタイム文字起こしプレビュー（コピーボタン付き、固定高さスクロール）
+// リアルタイム文字起こしプレビュー（言語セレクタ・コピーボタン付き、固定高さスクロール）
 
 import SwiftUI
 import AppKit
@@ -17,6 +17,9 @@ struct TranscriptionPreviewPanel: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
+            // 言語セレクタ（上部）
+            languageSelector
+
             // コピーボタン（テキストがある場合のみ）
             if !fullText.isEmpty {
                 HStack {
@@ -60,6 +63,53 @@ struct TranscriptionPreviewPanel: View {
             if let error = viewModel.errorMessage {
                 Text(error).font(.caption2).foregroundStyle(.red).padding(.horizontal, 8).padding(.bottom, 2)
             }
+        }
+    }
+
+    // MARK: - 言語セレクタ
+
+    /// 言語ラベル + Picker + 検出言語ラベル + 再判別ボタンを表示する
+    private var languageSelector: some View {
+        HStack(spacing: 6) {
+            // 言語 Picker（auto 含む全言語）
+            Picker("", selection: $viewModel.selectedLanguage) {
+                ForEach(TranscriptionLanguage.allCases) { lang in
+                    Text(lang.displayName).tag(lang)
+                }
+            }
+            .frame(width: 160)
+
+            // 検出言語ラベル + 再判別ボタン（自動検出モード時）
+            if viewModel.selectedLanguage == .auto {
+                if let detected = viewModel.detectedLanguage {
+                    Text(detected)
+                        .font(.caption2)
+                        .padding(.horizontal, 5)
+                        .padding(.vertical, 1)
+                        .background(Color.blue.opacity(0.15))
+                        .clipShape(RoundedRectangle(cornerRadius: 3))
+                }
+
+                // 再判別ボタン
+                Button {
+                    Task { await viewModel.restartStreamingWithNewLanguage() }
+                } label: {
+                    Image(systemName: "arrow.triangle.2.circlepath")
+                        .font(.caption)
+                        .foregroundStyle(.green)
+                }
+                .buttonStyle(.borderless)
+                .help("言語を再判別")
+                .disabled(!viewModel.isStreaming)
+            }
+
+            Spacer()
+        }
+        .padding(.horizontal, 8)
+        .padding(.vertical, 4)
+        // 言語変更時にストリーミングを再接続
+        .onChange(of: viewModel.selectedLanguage) { _, _ in
+            Task { await viewModel.restartStreamingWithNewLanguage() }
         }
     }
 }

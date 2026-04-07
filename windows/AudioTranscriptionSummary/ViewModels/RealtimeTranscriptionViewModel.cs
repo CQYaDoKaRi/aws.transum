@@ -12,6 +12,9 @@ public partial class RealtimeTranscriptionViewModel : ObservableObject
     [ObservableProperty] private string? _detectedLanguage;
     [ObservableProperty] private string? _errorMessage;
 
+    /// リアルタイム文字起こし言語（Auto = 自動検出）
+    [ObservableProperty] private TranscriptionLanguage _selectedRealtimeLanguage = TranscriptionLanguage.Auto;
+
     /// リアルタイム文字起こしのストリーム出力先ファイルパス
     public string? StreamOutputPath { get; set; }
 

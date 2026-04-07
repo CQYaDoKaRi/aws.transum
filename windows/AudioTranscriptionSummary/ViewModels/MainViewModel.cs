@@ -418,15 +418,26 @@ public partial class MainViewModel : ObservableObject
             _dispatcherQueue.TryEnqueue(async () =>
             {
                 RealtimeTranscriptionVM.AppendFinalTranscript(text);
-                // リアルタイム翻訳: 検出言語と翻訳先言語が異なる場合のみ実行
-                var fullText = RealtimeTranscriptionVM.FinalText;
-                if (!string.IsNullOrWhiteSpace(fullText))
+                // リアルタイム翻訳: 文字起こし言語と翻訳先言語が異なる場合のみ実行
+                if (!string.IsNullOrWhiteSpace(text))
                 {
-                    var detected = RealtimeTranscriptionVM.DetectedLanguage ?? "";
-                    var detectedPrefix = detected.Length >= 2 ? detected[..2].ToLower() : "";
                     var targetCode = RealtimeTranslationVM.SelectedTargetLanguage.ToCode();
-                    if (detectedPrefix != targetCode)
+                    string transcribeLangPrefix;
+                    if (RealtimeTranscriptionVM.SelectedRealtimeLanguage != TranscriptionLanguage.Auto)
                     {
+                        // 指定言語モード: 選択言語のプレフィックス
+                        var code = RealtimeTranscriptionVM.SelectedRealtimeLanguage.ToCode();
+                        transcribeLangPrefix = code.Length >= 2 ? code[..2].ToLower() : "";
+                    }
+                    else
+                    {
+                        // 自動検出モード: 検出された言語のプレフィックス
+                        var detected = RealtimeTranscriptionVM.DetectedLanguage ?? "";
+                        transcribeLangPrefix = detected.Length >= 2 ? detected[..2].ToLower() : "";
+                    }
+                    if (!string.IsNullOrEmpty(transcribeLangPrefix) && transcribeLangPrefix != targetCode)
+                    {
+                        var fullText = RealtimeTranscriptionVM.FinalText;
                         await RealtimeTranslationVM.TranslateCommand.ExecuteAsync(fullText);
                     }
                 }
@@ -447,8 +458,9 @@ public partial class MainViewModel : ObservableObject
         _audioCaptureService.DataAvailable -= OnAudioDataForStreaming;
         _audioCaptureService.DataAvailable += OnAudioDataForStreaming;
 
-        var language = SelectedTranscriptionLanguage.ToCode();
-        var autoDetect = SelectedTranscriptionLanguage == TranscriptionLanguage.Auto;
+        var realtimeLang = RealtimeTranscriptionVM.SelectedRealtimeLanguage;
+        var language = realtimeLang.ToCode();
+        var autoDetect = realtimeLang == TranscriptionLanguage.Auto;
         await _realtimeClient.StartStreamingAsync(language == "auto" ? "ja-JP" : language, autoDetect);
     }
 
@@ -517,6 +529,34 @@ public partial class MainViewModel : ObservableObject
     {
         _realtimeClient?.Dispose();
         _realtimeClient = null;
+    }
+
+    /// <summary>
+    /// リアルタイム文字起こしの言語変更時にストリーミングを再接続する。
+    /// 確定テキスト（FinalText）は保持し、暫定テキスト（PartialText）はクリアする。
+    /// </summary>
+    public async Task RestartRealtimeStreamingAsync()
+    {
+        if (!IsCapturing || _realtimeClient == null) return;
+
+        // 現在のストリーミングを停止
+        _realtimeClient.StopStreaming();
+        CleanupRealtimeClient();
+
+        // 暫定テキストをクリア（確定テキストは保持）
+        RealtimeTranscriptionVM.PartialText = "";
+        RealtimeTranscriptionVM.ErrorMessage = null;
+
+        // 新しい言語設定でストリーミング再開
+        try
+        {
+            var settings = _settingsStore.Load();
+            await StartRealtimeStreamingAsync(settings);
+        }
+        catch (Exception ex)
+        {
+            RealtimeTranscriptionVM.ErrorMessage = $"ストリーミング再接続エラー: {ex.Message}";
+        }
     }
 
     [RelayCommand]

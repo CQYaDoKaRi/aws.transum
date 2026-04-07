@@ -58,7 +58,7 @@ public static class TranscriptionLanguageExtensions
 
     public static string ToDisplayName(this TranscriptionLanguage lang) => lang switch
     {
-        TranscriptionLanguage.Auto => "自動判別",
+        TranscriptionLanguage.Auto => "言語自動判定",
         TranscriptionLanguage.Japanese => "日本語",
         TranscriptionLanguage.English => "英語",
         TranscriptionLanguage.Chinese => "中国語",
@@ -79,6 +79,6 @@ public static class TranscriptionLanguageExtensions
         TranscriptionLanguage.Indonesian => "インドネシア語",
         TranscriptionLanguage.Vietnamese => "ベトナム語",
         TranscriptionLanguage.Malay => "マレー語",
-        _ => "自動判別"
+        _ => "言語自動判定"
     };
 }

@@ -239,6 +239,18 @@ class AWSSettingsViewModel: ObservableObject {
         saveToFile()
     }
 
+    // MARK: - 個別設定の保存
+
+    /// リアルタイム文字起こし設定のみ保存する
+    func saveRealtimeSetting() {
+        saveToFile()
+    }
+
+    /// Bedrock 基盤モデル設定のみ保存する
+    func saveBedrockModelSetting() {
+        saveToFile()
+    }
+
     // MARK: - AWS 接続テスト
 
     func testConnection() async {

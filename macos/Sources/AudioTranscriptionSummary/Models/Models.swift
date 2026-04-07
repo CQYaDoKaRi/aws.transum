@@ -34,7 +34,7 @@ enum TranscriptionLanguage: String, CaseIterable, Identifiable {
 
     var displayName: String {
         switch self {
-        case .auto: return "自動"
+        case .auto: return "言語自動判定"
         case .japanese: return "日本語"
         case .english: return "英語"
         case .chinese: return "中国語"

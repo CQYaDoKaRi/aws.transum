@@ -369,6 +369,16 @@ public partial class MainViewModel : ObservableObject
         Summary = null;
         AudioFile = null;
 
+        // リアルタイム文字起こしのストリーム出力パスを設定
+        var captureSettings = _settingsStore.Load();
+        var recordingDir = !string.IsNullOrEmpty(captureSettings.RecordingDirectoryPath)
+            ? captureSettings.RecordingDirectoryPath
+            : System.IO.Path.Combine(System.IO.Path.GetTempPath(), "AudioTranscriptionSummary");
+        if (!System.IO.Directory.Exists(recordingDir))
+            System.IO.Directory.CreateDirectory(recordingDir);
+        var timestamp = DateTime.Now.ToString("yyyyMMdd_HHmmss");
+        RealtimeTranscriptionVM.StreamOutputPath = System.IO.Path.Combine(recordingDir, $"{timestamp}.transcribe.stream.txt");
+
         try
         {
             _audioCaptureService.StartCapture(SelectedSource);

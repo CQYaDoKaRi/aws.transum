@@ -283,8 +283,18 @@ struct MainView: View {
 
             realtimeVM.finalText = ""; realtimeVM.partialText = ""
             realtimeVM.detectedLanguage = nil; realtimeVM.errorMessage = nil
+            realtimeVM.streamOutputPath = nil
             realtimeTranslationVM.reset(); transcriptTranslationVM.reset(); summaryTranslationVM.reset()
             viewModel.transcript = nil; viewModel.summary = nil; viewModel.audioFile = nil
+
+            // リアルタイム文字起こしのストリーム出力パスを設定
+            let saveDir = AWSSettingsViewModel.recordingDirectory
+            let dateStr = {
+                let f = DateFormatter(); f.dateFormat = "yyyyMMdd_HHmmss"
+                f.locale = Locale(identifier: "en_US_POSIX"); return f.string(from: Date())
+            }()
+            realtimeVM.streamOutputPath = saveDir.appendingPathComponent("\(dateStr).transcribe.stream.txt")
+
             if awsSettingsViewModel.isRealtimeEnabled {
                 Task { await realtimeVM.startStreaming() }
                 viewModel.setRealtimeAudioCallback { [weak realtimeVM] buffer in realtimeVM?.sendAudioBuffer(buffer) }
@@ -297,6 +307,7 @@ struct MainView: View {
             }
 
             realtimeVM.stopStreaming()
+            realtimeVM.streamOutputPath = nil
             if let af = viewModel.audioFile, let t = realtimeVM.toTranscript(audioFileId: af.id) { viewModel.transcript = t }
             viewModel.setRealtimeAudioCallback(nil)
         }

@@ -22,8 +22,7 @@ final class SystemAudioCapture: NSObject, @unchecked Sendable {
     private var assetWriter: AVAssetWriter?
     private var audioInput: AVAssetWriterInput?
     private(set) var isCapturing: Bool = false
-    private var rawFileURL: URL?   // パススルー保存用の一時ファイル
-    private var finalFileURL: URL? // MP3 変換後の最終ファイル
+    private var finalFileURL: URL? // 最終保存先ファイル
     weak var delegate: (any SystemAudioCaptureDelegate)?
     /// リアルタイム文字起こし用の音声バッファ転送コールバック
     /// 録音中の CMSampleBuffer を RealtimeTranscriptionViewModel に転送する
@@ -66,17 +65,12 @@ final class SystemAudioCapture: NSObject, @unchecked Sendable {
             try FileManager.default.createDirectory(at: saveDir, withIntermediateDirectories: true)
         }
         let dateStr = Self.fileNameFormatter.string(from: Date())
-        let uid = UUID().uuidString.prefix(8)
-        // 直接 M4A（AAC）に書き出す（MOV 経由の変換を廃止）
-        let tmpM4A = FileManager.default.temporaryDirectory.appendingPathComponent("rec_\(dateStr)_\(uid).m4a")
+        // 最終保存先に直接書き込む（一時ファイルを経由しない）
         let finalM4A = saveDir.appendingPathComponent("\(dateStr).m4a")
-        rawFileURL = tmpM4A
         finalFileURL = finalM4A
 
-        // ログ: 開始情報（デバッグ用、エラー時のみ出力するため削除）
-
         // AVAssetWriter を準備（AAC で直接 M4A に書き込み）
-        let writer = try AVAssetWriter(outputURL: tmpM4A, fileType: .m4a)
+        let writer = try AVAssetWriter(outputURL: finalM4A, fileType: .m4a)
         // AAC エンコード設定で AVAssetWriterInput を事前に作成
         let audioSettings: [String: Any] = [
             AVFormatIDKey: kAudioFormatMPEG4AAC,
@@ -230,9 +224,17 @@ final class SystemAudioCapture: NSObject, @unchecked Sendable {
                           userInfo: [NSLocalizedDescriptionKey: "キャプチャが開始されていません"])
         }
 
-        if let stream = stream { try await stream.stopCapture() }
-        captureSession?.stopRunning()
-        captureSession = nil; captureOutput = nil
+        // マイク録音の場合は AVCaptureSession を停止、SCStream は触らない
+        if currentSourceType.isMicrophone {
+            captureSession?.stopRunning()
+            captureSession = nil; captureOutput = nil
+        } else {
+            // システム音声の場合は SCStream を停止
+            if let s = stream {
+                do { try await s.stopCapture() } catch { /* 既に停止済みの場合は無視 */ }
+            }
+        }
+        stream = nil
         audioInput?.markAsFinished()
 
         if let writer = assetWriter {
@@ -241,67 +243,52 @@ final class SystemAudioCapture: NSObject, @unchecked Sendable {
         isCapturing = false
         await MainActor.run { [weak self] in self?.delegate?.captureDidStop() }
 
-        guard let tmpM4A = rawFileURL, let finalM4A = finalFileURL else {
+        guard let finalM4A = finalFileURL else {
             let err = NSError(domain: "SystemAudioCapture", code: -5,
                               userInfo: [NSLocalizedDescriptionKey: "録音ファイルのパスが設定されていません"])
-            ErrorLogger.saveErrorLog(error: err, operation: "録音保存", context: ["rawFileURL": rawFileURL?.path ?? "nil", "finalFileURL": finalFileURL?.path ?? "nil"])
+            ErrorLogger.saveErrorLog(error: err, operation: "録音保存", context: ["finalFileURL": finalFileURL?.path ?? "nil"])
             throw err
         }
 
-        let tmpExists = FileManager.default.fileExists(atPath: tmpM4A.path)
-        let tmpAttrs = try? FileManager.default.attributesOfItem(atPath: tmpM4A.path)
-        let tmpSize = tmpAttrs?[.size] as? Int64 ?? 0
+        let fileExists = FileManager.default.fileExists(atPath: finalM4A.path)
+        let fileAttrs = try? FileManager.default.attributesOfItem(atPath: finalM4A.path)
+        let fileSize = fileAttrs?[.size] as? Int64 ?? 0
 
-        guard tmpExists, tmpSize > 0 else {
-            try? FileManager.default.removeItem(at: tmpM4A)
-            stream = nil; assetWriter = nil; audioInput = nil
+        guard fileExists, fileSize > 0 else {
+            try? FileManager.default.removeItem(at: finalM4A)
+            assetWriter = nil; audioInput = nil
 
             let err = NSError(domain: "SystemAudioCapture", code: -8,
                               userInfo: [NSLocalizedDescriptionKey: "音声データが検出されませんでした。録音中に音声が再生されていたか確認してください。"])
             ErrorLogger.saveErrorLog(
                 error: err,
                 operation: "録音_音声データなし",
-                context: ["tmpM4A": tmpM4A.path, "size": "0", "sourceType": "\(currentSourceType)"])
+                context: ["finalM4A": finalM4A.path, "size": "0", "sourceType": "\(currentSourceType)"])
             throw AppError.transcriptionFailed(underlying: err)
         }
 
-        // 一時ファイルを最終保存先に移動（既に M4A なので変換不要）
         let duration = Date().timeIntervalSince(captureStartTime ?? Date())
-        do {
-            if FileManager.default.fileExists(atPath: finalM4A.path) {
-                try FileManager.default.removeItem(at: finalM4A)
-            }
-            try FileManager.default.moveItem(at: tmpM4A, to: finalM4A)
-            let attrs = try FileManager.default.attributesOfItem(atPath: finalM4A.path)
-            let fileSize = attrs[.size] as? Int64 ?? 0
-            let audioFile = AudioFile(id: UUID(), url: finalM4A, fileName: finalM4A.deletingPathExtension().lastPathComponent,
-                                      fileExtension: "m4a", duration: duration, fileSize: fileSize, createdAt: Date())
-            stream = nil; assetWriter = nil; audioInput = nil
-            return audioFile
-        } catch {
-            ErrorLogger.saveErrorLog(error: error, operation: "録音_ファイル移動失敗",
-                                     context: ["tmpM4A": tmpM4A.path, "finalM4A": finalM4A.path, "tmpSize": "\(tmpSize)"])
-            // 移動失敗時は一時ファイルをそのまま使用
-            let attrs = try? FileManager.default.attributesOfItem(atPath: tmpM4A.path)
-            let fileSize = attrs?[.size] as? Int64 ?? 0
-            let audioFile = AudioFile(id: UUID(), url: tmpM4A, fileName: tmpM4A.deletingPathExtension().lastPathComponent,
-                                      fileExtension: "m4a", duration: duration, fileSize: fileSize, createdAt: Date())
-            stream = nil; assetWriter = nil; audioInput = nil
-            return audioFile
-        }
+        let audioFile = AudioFile(id: UUID(), url: finalM4A, fileName: finalM4A.deletingPathExtension().lastPathComponent,
+                                  fileExtension: "m4a", duration: duration, fileSize: fileSize, createdAt: Date())
+        assetWriter = nil; audioInput = nil
+        return audioFile
     }
 
     // MARK: - キャンセル
 
     func cancelCapture() async {
-        if let stream = stream { try? await stream.stopCapture() }
-        captureSession?.stopRunning()
-        captureSession = nil; captureOutput = nil
+        if currentSourceType.isMicrophone {
+            captureSession?.stopRunning()
+            captureSession = nil; captureOutput = nil
+        } else {
+            if let s = stream { try? await s.stopCapture() }
+        }
+        stream = nil
         audioInput?.markAsFinished()
         await assetWriter?.finishWriting()
         if let url = finalFileURL { try? FileManager.default.removeItem(at: url) }
         isCapturing = false
-        stream = nil; assetWriter = nil; audioInput = nil; rawFileURL = nil; finalFileURL = nil
+        assetWriter = nil; audioInput = nil; finalFileURL = nil
         await MainActor.run { [weak self] in self?.delegate?.captureDidStop() }
     }
 

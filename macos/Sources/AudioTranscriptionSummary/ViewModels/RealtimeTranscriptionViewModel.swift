@@ -37,6 +37,9 @@ class RealtimeTranscriptionViewModel: ObservableObject {
     /// リアルタイム翻訳用の TranslationViewModel（外部から設定）
     var realtimeTranslationVM: TranslationViewModel?
 
+    /// リアルタイム文字起こしのストリーム出力先ファイルパス
+    var streamOutputPath: URL?
+
     // MARK: - ストリーミング開始
 
     /// リアルタイム文字起こしストリーミングを開始する
@@ -71,6 +74,8 @@ class RealtimeTranscriptionViewModel: ObservableObject {
                 if let lang = lang {
                     self.detectedLanguage = lang
                 }
+                // ストリーム出力: 確定テキストをファイルに逐次追記
+                self.appendToStreamFile(text + "\n")
                 // 確定テキストをリアルタイム翻訳
                 await self.realtimeTranslationVM?.translateAppend(text)
             }
@@ -142,5 +147,26 @@ class RealtimeTranscriptionViewModel: ObservableObject {
             language: lang,
             createdAt: Date()
         )
+    }
+
+    // MARK: - ストリーム出力
+
+    /// 確定テキストをストリーム出力ファイルに逐次追記する
+    private func appendToStreamFile(_ text: String) {
+        guard let path = streamOutputPath else { return }
+        do {
+            if FileManager.default.fileExists(atPath: path.path) {
+                let handle = try FileHandle(forWritingTo: path)
+                handle.seekToEndOfFile()
+                if let data = text.data(using: .utf8) {
+                    handle.write(data)
+                }
+                handle.closeFile()
+            } else {
+                try text.write(to: path, atomically: false, encoding: .utf8)
+            }
+        } catch {
+            // ストリーム出力の失敗は録音に影響させない
+        }
     }
 }

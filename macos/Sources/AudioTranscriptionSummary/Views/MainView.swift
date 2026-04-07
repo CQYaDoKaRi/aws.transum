@@ -72,6 +72,7 @@ struct MainView: View {
                     }
                 } label: { Image(systemName: "stop.circle.fill").foregroundStyle(.red).font(.title3) }
                     .help("停止")
+                    .disabled(viewModel.isStoppingCapture)
             } else {
                 Button {
                     Task {
@@ -80,6 +81,7 @@ struct MainView: View {
                     }
                 } label: { Image(systemName: "mic.circle.fill").foregroundStyle(.red).font(.title3) }
                     .help(viewModel.selectedAudioSource.isScreenRecording ? "録画開始" : "録音開始")
+                    .disabled(viewModel.isStartingCapture)
             }
         }
         // キャンセルボタン
@@ -92,6 +94,7 @@ struct MainView: View {
                     }
                 } label: { Image(systemName: "xmark.circle").font(.title3) }
                     .help("キャンセル")
+                    .disabled(viewModel.isStoppingCapture)
             }
         }
         // 設定（右端）
@@ -186,13 +189,7 @@ struct MainView: View {
                 .background(RoundedRectangle(cornerRadius: 8).fill(Color(.controlBackgroundColor)))
                 .task { await viewModel.refreshAudioSources() }
             } statusContent: {
-                if viewModel.isCapturingSystemAudio {
-                    Circle().fill(.red).frame(width: 6, height: 6)
-                    Text("録音中").font(.caption2).foregroundStyle(.red)
-                } else if viewModel.isRecordingScreen {
-                    Circle().fill(.red).frame(width: 6, height: 6)
-                    Text("録画中").font(.caption2).foregroundStyle(.red)
-                }
+                EmptyView()
             }
         }
         .background(Color(.windowBackgroundColor))
@@ -227,7 +224,20 @@ struct MainView: View {
                                 isRealtimeExpanded = false
                             }
                         }, isDisabled: isAnyCapturing).padding(.horizontal, 8).padding(.top, 4).padding(.bottom, 2)
-                        AudioPlayerView(viewModel: viewModel).padding(.horizontal, 8).padding(.vertical, 2)
+                        // ファイルリスト（ファイルがある場合のみ表示）
+                        if !viewModel.fileList.isEmpty {
+                            FileListView(viewModel: viewModel)
+                                .padding(.horizontal, 8)
+                                .padding(.vertical, 2)
+                                .disabled(isAnyCapturing)
+                                .opacity(isAnyCapturing ? 0.5 : 1.0)
+                        }
+                        AudioPlayerView(viewModel: viewModel)
+                            .padding(.horizontal, 8).padding(.vertical, 2)
+                            .disabled(isAnyCapturing)
+                            .opacity(isAnyCapturing ? 0.5 : 1.0)
+                        // オーディオスペクトラム
+                        AudioSpectrumView(viewModel: viewModel, audioLevel: isAnyCapturing ? viewModel.captureAudioLevel : (viewModel.isPlaying ? 0.5 : 0))
                         Divider()
                         HStack(spacing: 0) {
                             TranscriptView(viewModel: viewModel).frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -235,6 +245,8 @@ struct MainView: View {
                             TranslationPanel(sourceText: viewModel.transcript?.text ?? "", translationVM: transcriptTranslationVM).frame(maxWidth: .infinity, maxHeight: .infinity)
                         }
                         .frame(minHeight: 100)
+                        .disabled(isAnyCapturing)
+                        .opacity(isAnyCapturing ? 0.5 : 1.0)
                     }
                 }
                 Divider()

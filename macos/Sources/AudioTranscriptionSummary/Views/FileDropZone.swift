@@ -1,6 +1,6 @@
 // FileDropZone.swift
-// ファイル読み込みエリア（D&D + ファイル選択）
-// 未選択時: コンパクトな点線枠、選択後: ファイル情報表示
+// ファイル読み込みエリア（D&D + ファイル追加）
+// 常にドロップゾーンを表示し、ファイルはリストに登録するのみ
 
 import SwiftUI
 import UniformTypeIdentifiers
@@ -17,70 +17,6 @@ struct FileDropZone: View {
     private static let supportedTypes: [UTType] = [.audio, .movie, .video, .mpeg4Movie, .quickTimeMovie]
 
     var body: some View {
-        Group {
-            if let audioFile = viewModel.audioFile {
-                fileInfoView(audioFile: audioFile)
-            } else {
-                dropGuidanceView
-            }
-        }
-        .onDrop(of: [.fileURL], isTargeted: $isDragOver) { isDisabled ? false : handleDrop(providers: $0) }
-        .fileImporter(isPresented: $isFileImporterPresented, allowedContentTypes: Self.supportedTypes, allowsMultipleSelection: false) { handleFileImporterResult($0) }
-        .keyboardShortcut("o", modifiers: .command)
-        .opacity(isDisabled ? 0.5 : 1.0)
-    }
-
-    // MARK: - ファイル情報表示
-
-    private func fileInfoView(audioFile: AudioFile) -> some View {
-        HStack(spacing: 8) {
-            Image(systemName: FileImporter.videoExtensions.contains(audioFile.fileExtension.lowercased()) ? "film" : "waveform")
-                .foregroundStyle(Color.accentColor)
-
-            VStack(alignment: .leading, spacing: 1) {
-                Text(audioFile.fileName)
-                    .font(.caption)
-                    .fontWeight(.medium)
-                    .lineLimit(1)
-                HStack(spacing: 6) {
-                    Text(audioFile.fileExtension.uppercased())
-                        .font(.caption2)
-                        .padding(.horizontal, 4)
-                        .padding(.vertical, 1)
-                        .background(Color.accentColor.opacity(0.15))
-                        .clipShape(RoundedRectangle(cornerRadius: 3))
-                    Text(formatDuration(audioFile.duration))
-                        .font(.caption2)
-                        .foregroundStyle(.secondary)
-                }
-            }
-
-            Spacer()
-
-            Button { isFileImporterPresented = true } label: {
-                Label("別のファイル", systemImage: "folder").font(.caption2)
-            }
-            .controlSize(.small)
-            .disabled(isDisabled)
-        }
-        .padding(.horizontal, 10)
-        .padding(.vertical, 6)
-        .background(
-            RoundedRectangle(cornerRadius: 6)
-                .fill(isDragOver ? Color.accentColor.opacity(0.1) : Color.clear)
-        )
-        .overlay(
-            RoundedRectangle(cornerRadius: 6)
-                .strokeBorder(
-                    isDragOver ? Color.accentColor : Color(.separatorColor),
-                    style: StrokeStyle(lineWidth: 1, dash: [6, 3])
-                )
-        )
-    }
-
-    // MARK: - ドロップゾーン（未選択時）
-
-    private var dropGuidanceView: some View {
         HStack(spacing: 8) {
             Image(systemName: "arrow.down.doc")
                 .foregroundStyle(isDragOver ? Color.accentColor : .secondary)
@@ -92,7 +28,7 @@ struct FileDropZone: View {
             Spacer()
 
             Button { isFileImporterPresented = true } label: {
-                Label("ファイルを選択", systemImage: "folder").font(.caption2)
+                Label("ファイル追加", systemImage: "plus").font(.caption2)
             }
             .controlSize(.small)
             .disabled(isDisabled)
@@ -110,33 +46,47 @@ struct FileDropZone: View {
             RoundedRectangle(cornerRadius: 6)
                 .fill(isDragOver ? Color.accentColor.opacity(0.05) : Color.clear)
         )
+        .onDrop(of: [.fileURL], isTargeted: $isDragOver) { isDisabled ? false : handleDrop(providers: $0) }
+        .fileImporter(isPresented: $isFileImporterPresented, allowedContentTypes: Self.supportedTypes, allowsMultipleSelection: true) { handleFileImporterResult($0) }
+        .keyboardShortcut("o", modifiers: .command)
+        .opacity(isDisabled ? 0.5 : 1.0)
     }
 
     // MARK: - ハンドラ
 
     private func handleDrop(providers: [NSItemProvider]) -> Bool {
-        guard let provider = providers.first else { return false }
-        provider.loadItem(forTypeIdentifier: "public.file-url", options: nil) { data, _ in
-            guard let urlData = data as? Data, let url = URL(dataRepresentation: urlData, relativeTo: nil) else { return }
-            Task { @MainActor in
-                onFileSelected?()
-                await viewModel.importFile(from: url)
+        guard !providers.isEmpty else { return false }
+        var loadedCount = 0
+        let total = providers.count
+        nonisolated(unsafe) var urls: [URL] = []
+        for provider in providers {
+            provider.loadItem(forTypeIdentifier: "public.file-url", options: nil) { data, _ in
+                if let urlData = data as? Data, let url = URL(dataRepresentation: urlData, relativeTo: nil) {
+                    urls.append(url)
+                }
+                loadedCount += 1
+                if loadedCount == total {
+                    let capturedURLs = urls
+                    Task { @MainActor [weak viewModel] in
+                        guard let viewModel = viewModel else { return }
+                        onFileSelected?()
+                        await viewModel.addFilesToList(capturedURLs)
+                    }
+                }
             }
         }
         return true
     }
 
     private func handleFileImporterResult(_ result: Result<[URL], Error>) {
-        guard case .success(let urls) = result, let url = urls.first else { return }
-        let accessed = url.startAccessingSecurityScopedResource()
+        guard case .success(let urls) = result else { return }
+        let accessedURLs = urls.map { ($0, $0.startAccessingSecurityScopedResource()) }
         Task { @MainActor in
             onFileSelected?()
-            await viewModel.importFile(from: url)
-            if accessed { url.stopAccessingSecurityScopedResource() }
+            await viewModel.addFilesToList(urls)
+            for (url, accessed) in accessedURLs {
+                if accessed { url.stopAccessingSecurityScopedResource() }
+            }
         }
-    }
-
-    private func formatDuration(_ duration: TimeInterval) -> String {
-        let s = Int(duration); return String(format: "%02d:%02d", s / 60, s % 60)
     }
 }

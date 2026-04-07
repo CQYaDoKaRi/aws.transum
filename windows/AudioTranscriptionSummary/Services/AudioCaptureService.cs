@@ -15,18 +15,26 @@ public class AudioCaptureService : IDisposable
     private string? _outputPath;
     private bool _disposed;
 
+    /// <summary>録音分割マネージャー</summary>
+    private SplitRecordingManager? _splitManager;
+
+    /// <summary>分割切り替え中のロックオブジェクト</summary>
+    private readonly object _writerLock = new();
+
     public bool IsCapturing { get; private set; }
     public float AudioLevel { get; private set; }
     public WaveFormat? CaptureWaveFormat { get; private set; }
 
     public event EventHandler<float>? AudioLevelChanged;
     public event EventHandler<byte[]>? DataAvailable;
+    /// <summary>分割ファイル確定時のコールバック（ファイルパスを通知）</summary>
+    public event EventHandler<string>? FileSplitCompleted;
 
     public List<AudioSourceInfo> EnumerateDevices()
     {
         var devices = new List<AudioSourceInfo>();
 
-        // Enumerate microphone devices
+        // マイクデバイスを列挙
         int deviceCount = WaveInEvent.DeviceCount;
         for (int i = 0; i < deviceCount; i++)
         {
@@ -39,7 +47,7 @@ public class AudioCaptureService : IDisposable
             });
         }
 
-        // Add system audio loopback
+        // システム音声ループバックを追加
         devices.Add(new AudioSourceInfo
         {
             Id = "loopback",
@@ -63,7 +71,12 @@ public class AudioCaptureService : IDisposable
             Directory.CreateDirectory(recordingDir);
 
         var timestamp = DateTime.Now.ToString("yyyyMMdd_HHmmss");
-        _outputPath = Path.Combine(recordingDir, $"{timestamp}.wav");
+
+        // SplitRecordingManager を初期化
+        _splitManager = new SplitRecordingManager(timestamp, recordingDir);
+
+        // 最初の分割ファイルパスを取得
+        _outputPath = _splitManager.NextFilePath();
 
         if (source.IsLoopback)
         {
@@ -90,19 +103,63 @@ public class AudioCaptureService : IDisposable
 
         IsCapturing = true;
         _capture.StartRecording();
+
+        // 分割タイマーを開始
+        _splitManager.StartSplitting(nextPath =>
+        {
+            // 分割コールバック: 現在の WaveFileWriter を確定し、新しいファイルで再開
+            lock (_writerLock)
+            {
+                try
+                {
+                    var completedPath = _outputPath;
+                    // 現在のライターを確定
+                    _writer?.Dispose();
+                    _writer = null;
+
+                    // 確定した分割ファイルを通知
+                    if (!string.IsNullOrEmpty(completedPath) && File.Exists(completedPath))
+                    {
+                        FileSplitCompleted?.Invoke(this, completedPath!);
+                    }
+
+                    // 新しいファイルで WaveFileWriter を開始
+                    _outputPath = nextPath;
+                    if (CaptureWaveFormat != null)
+                    {
+                        _writer = new WaveFileWriter(nextPath, CaptureWaveFormat);
+                    }
+                }
+                catch (Exception)
+                {
+                    // 分割ファイル書き込み失敗時は録音を継続
+                }
+            }
+        });
     }
 
-    public string StopCapture()
+    /// <summary>
+    /// 録音を停止し、全分割ファイルのパスリストを返す
+    /// </summary>
+    public List<string> StopCapture()
     {
         if (!IsCapturing || _capture == null)
             throw new InvalidOperationException("No capture in progress.");
 
+        // 分割タイマーを停止
+        _splitManager?.StopSplitting();
+
         _capture.StopRecording();
         IsCapturing = false;
 
-        CleanupWriter();
+        lock (_writerLock)
+        {
+            CleanupWriter();
+        }
 
-        return _outputPath!;
+        // 全分割ファイルのパスリストを返す
+        var files = _splitManager?.SplitFiles ?? new List<string>();
+        return new List<string>(files);
     }
 
     public void CancelCapture()
@@ -110,15 +167,25 @@ public class AudioCaptureService : IDisposable
         if (!IsCapturing || _capture == null)
             return;
 
+        // 分割タイマーを停止
+        _splitManager?.StopSplitting();
+
         _capture.StopRecording();
         IsCapturing = false;
 
-        CleanupWriter();
-
-        // Delete the partial file
-        if (_outputPath != null && File.Exists(_outputPath))
+        lock (_writerLock)
         {
-            try { File.Delete(_outputPath); } catch { }
+            CleanupWriter();
+        }
+
+        // 分割中の全ファイルを削除
+        if (_splitManager != null)
+        {
+            foreach (var filePath in _splitManager.SplitFiles)
+            {
+                try { if (File.Exists(filePath)) File.Delete(filePath); } catch { }
+            }
+            _splitManager.Reset();
         }
 
         _outputPath = null;
@@ -126,11 +193,14 @@ public class AudioCaptureService : IDisposable
 
     private void OnDataAvailable(object? sender, WaveInEventArgs e)
     {
-        _writer?.Write(e.Buffer, 0, e.BytesRecorded);
+        lock (_writerLock)
+        {
+            _writer?.Write(e.Buffer, 0, e.BytesRecorded);
+        }
 
-        // Calculate RMS audio level (0.0 - 1.0)
+        // RMS 音声レベルを計算（0.0 - 1.0）
         float sum = 0;
-        int sampleCount = e.BytesRecorded / 2; // 16-bit samples
+        int sampleCount = e.BytesRecorded / 2; // 16ビットサンプル
         if (sampleCount > 0)
         {
             for (int i = 0; i < e.BytesRecorded; i += 2)
@@ -148,7 +218,7 @@ public class AudioCaptureService : IDisposable
             AudioLevelChanged?.Invoke(this, AudioLevel);
         }
 
-        // Forward raw data for realtime streaming
+        // リアルタイムストリーミング用に生データを転送
         if (e.BytesRecorded > 0)
         {
             var data = new byte[e.BytesRecorded];

@@ -1,5 +1,6 @@
 #nullable enable
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
@@ -111,6 +112,9 @@ public sealed partial class MainPage : Page
         TranscribeButton.IsEnabled = false;
         TranscriptionLangCombo.IsEnabled = false;
 
+        // FileList の変更を監視してUIを更新
+        _vm.FileList.CollectionChanged += (_, _) => UpdateFileListUI();
+
         // 追加プロンプトを復元
         SummaryPromptBox.Text = _vm.SummaryAdditionalPrompt;
 
@@ -124,9 +128,15 @@ public sealed partial class MainPage : Page
             {
                 case nameof(MainViewModel.AudioLevel):
                     LevelMeter.Value = _vm.AudioLevel;
+                    UpdateSpectrumBars(_vm.AudioLevel);
                     break;
                 case nameof(MainViewModel.IsCapturing):
                     UpdateRecordingUI();
+                    UpdateFileListUI();
+                    break;
+                case nameof(MainViewModel.IsStartingCapture):
+                case nameof(MainViewModel.IsStoppingCapture):
+                    UpdateCaptureButtonStates();
                     break;
                 case nameof(MainViewModel.Transcript):
                     TranscriptText.Text = _vm.Transcript?.Text ?? "";
@@ -141,8 +151,8 @@ public sealed partial class MainPage : Page
                     TranslateSummaryBtn.IsEnabled = !string.IsNullOrEmpty(_vm.Summary?.Text);
                     break;
                 case nameof(MainViewModel.IsTranscribing):
-                    TranscribeButton.IsEnabled = _vm.AudioFile != null && !_vm.IsTranscribing;
-                    TranscriptionLangCombo.IsEnabled = _vm.AudioFile != null && !_vm.IsTranscribing;
+                    TranscribeButton.IsEnabled = (_vm.AudioFile != null || _vm.FileList.Count > 0) && !_vm.IsTranscribing;
+                    TranscriptionLangCombo.IsEnabled = (_vm.AudioFile != null || _vm.FileList.Count > 0) && !_vm.IsTranscribing;
                     SummaryFileBtn.IsEnabled = !_vm.IsTranscribing && !_vm.IsSummarizing;
                     ResummarizeBtn.IsEnabled = !_vm.IsTranscribing && !_vm.IsSummarizing;
                     break;
@@ -161,8 +171,8 @@ public sealed partial class MainPage : Page
                     break;
                 case nameof(MainViewModel.AudioFile):
                     UpdateFileInfo();
-                    TranscribeButton.IsEnabled = _vm.AudioFile != null && !_vm.IsTranscribing;
-                    TranscriptionLangCombo.IsEnabled = _vm.AudioFile != null && !_vm.IsTranscribing;
+                    TranscribeButton.IsEnabled = (_vm.AudioFile != null || _vm.FileList.Count > 0) && !_vm.IsTranscribing;
+                    TranscriptionLangCombo.IsEnabled = (_vm.AudioFile != null || _vm.FileList.Count > 0) && !_vm.IsTranscribing;
                     break;
                 case nameof(MainViewModel.IsPlaying):
                     PlayPauseButton.Content = _vm.IsPlaying ? "\uE769" : "\uE768";
@@ -275,9 +285,14 @@ public sealed partial class MainPage : Page
         SummaryFileBtn.IsEnabled = !_vm.IsCapturing;
         ResummarizeBtn.IsEnabled = !_vm.IsCapturing;
 
+        // 録音中は音声文字起こしエリア内の GUI を無効化
+        FileListPanel.IsEnabled = !_vm.IsCapturing;
+        PlayerPanel.IsEnabled = !_vm.IsCapturing;
+        TranscribeButton.IsEnabled = !_vm.IsCapturing && _vm.AudioFile != null;
+        TranscriptionLangCombo.IsEnabled = !_vm.IsCapturing && _vm.AudioFile != null;
+
         if (_vm.IsCapturing)
         {
-            // 録音開始: 入力とリアルタイムを展開、音声文字起こしと要約を閉じる
             InputSection.IsExpanded = true;
             RealtimeSection.IsExpanded = true;
             TranscriptSection.IsExpanded = false;
@@ -285,10 +300,18 @@ public sealed partial class MainPage : Page
         }
         else
         {
-            // 録音終了: 音声文字起こしと要約を展開
             TranscriptSection.IsExpanded = true;
             SummarySection.IsExpanded = true;
         }
+        UpdateCaptureButtonStates();
+    }
+
+    /// 録音開始中/停止中のボタン無効化状態を更新する
+    private void UpdateCaptureButtonStates()
+    {
+        RecordButton.IsEnabled = !_vm.IsStartingCapture && !_vm.IsStoppingCapture;
+        StopRecordButton.IsEnabled = !_vm.IsStartingCapture && !_vm.IsStoppingCapture;
+        CancelButton.IsEnabled = !_vm.IsStartingCapture && !_vm.IsStoppingCapture;
     }
 
     private void UpdateFileInfo()
@@ -299,11 +322,59 @@ public sealed partial class MainPage : Page
             FileInfoText.Text = $"{af.FileName} ({af.Extension}) - {af.Duration:mm\\:ss}";
             PlayerPanel.Visibility = Visibility.Visible;
             PositionSlider.Maximum = _vm.AudioDuration.TotalSeconds;
+            SpectrumPanel.Visibility = Visibility.Visible;
+            InitializeSpectrumBars();
         }
         else
         {
             FileInfoText.Text = "";
             PlayerPanel.Visibility = Visibility.Collapsed;
+            SpectrumPanel.Visibility = Visibility.Collapsed;
+        }
+    }
+
+    /// スペクトラムバーを初期化する
+    private void InitializeSpectrumBars()
+    {
+        if (SpectrumBars.Children.Count == 0)
+        {
+            for (int i = 0; i < 32; i++)
+            {
+                var bar = new Microsoft.UI.Xaml.Shapes.Rectangle
+                {
+                    Width = 4,
+                    Height = 1,
+                    Fill = new Microsoft.UI.Xaml.Media.SolidColorBrush(Microsoft.UI.Colors.Green),
+                    RadiusX = 1,
+                    RadiusY = 1,
+                    VerticalAlignment = VerticalAlignment.Bottom
+                };
+                SpectrumBars.Children.Add(bar);
+            }
+        }
+    }
+
+    /// スペクトラムバーを音声レベルに応じて更新する
+    private void UpdateSpectrumBars(float level)
+    {
+        if (SpectrumBars.Children.Count == 0) return;
+        var maxHeight = 28.0;
+        for (int i = 0; i < SpectrumBars.Children.Count; i++)
+        {
+            if (SpectrumBars.Children[i] is Microsoft.UI.Xaml.Shapes.Rectangle bar)
+            {
+                // 中央が高く端が低い山型
+                var center = SpectrumBars.Children.Count / 2.0;
+                var dist = Math.Abs(i - center) / center;
+                var baseH = Math.Max(0, 1 - dist * 0.7) * level;
+                var variation = ((i * 7 + (int)(level * 100)) % 10) / 20.0f;
+                var h = Math.Clamp(baseH + variation * level, 0, 1);
+                bar.Height = Math.Max(1, maxHeight * h);
+                bar.Fill = new Microsoft.UI.Xaml.Media.SolidColorBrush(
+                    h > 0.7 ? Microsoft.UI.Colors.Red :
+                    h > 0.4 ? Microsoft.UI.Colors.Yellow :
+                    Microsoft.UI.Colors.Green);
+            }
         }
     }
 
@@ -321,11 +392,20 @@ public sealed partial class MainPage : Page
     private void OnStopRecordClick(object sender, RoutedEventArgs e) => _vm.StopCaptureCommand.Execute(null);
     private void OnCancelClick(object sender, RoutedEventArgs e) => _vm.CancelCaptureCommand.Execute(null);
 
-    // Transcribe
+    // Transcribe（FileList にファイルがある場合は複数ファイル一括文字起こし）
     private void OnTranscribeClick(object sender, RoutedEventArgs e)
     {
         _vm.SummaryAdditionalPrompt = SummaryPromptBox.Text;
-        _vm.TranscribeAndSummarizeCommand.Execute(null);
+        if (_vm.FileList.Count > 0)
+        {
+            // ファイルリストがある場合は複数ファイル一括文字起こし
+            _vm.TranscribeMultipleFilesCommand.Execute(null);
+        }
+        else
+        {
+            // ファイルリストが空で audioFile がある場合は従来の文字起こし
+            _vm.TranscribeAndSummarizeCommand.Execute(null);
+        }
     }
 
     // Play/Pause
@@ -546,16 +626,17 @@ public sealed partial class MainPage : Page
         if (e.DataView.Contains(StandardDataFormats.StorageItems))
         {
             var items = await e.DataView.GetStorageItemsAsync();
-            var file = items.OfType<StorageFile>().FirstOrDefault();
-            if (file != null)
+            var files = items.OfType<StorageFile>().ToList();
+            if (files.Count > 0)
             {
                 CollapseInputAndRealtime();
-                _vm.ImportFileCommand.Execute(file.Path);
+                _vm.AddFilesToList(files.Select(f => f.Path));
+                UpdateFileListUI();
             }
         }
     }
 
-    // File picker
+    // File picker（複数選択対応、常にファイルリストに追加）
     private async void OnFilePickClick(object sender, RoutedEventArgs e)
     {
         var picker = new FileOpenPicker();
@@ -567,11 +648,12 @@ public sealed partial class MainPage : Page
         if (hwnd != IntPtr.Zero)
             WinRT.Interop.InitializeWithWindow.Initialize(picker, hwnd);
 
-        var file = await picker.PickSingleFileAsync();
-        if (file != null)
+        var files = await picker.PickMultipleFilesAsync();
+        if (files != null && files.Count > 0)
         {
             CollapseInputAndRealtime();
-            _vm.ImportFileCommand.Execute(file.Path);
+            _vm.AddFilesToList(files.Select(f => f.Path));
+            UpdateFileListUI();
         }
     }
 
@@ -783,6 +865,68 @@ public sealed partial class MainPage : Page
     {
         _vm.SummaryAdditionalPrompt = SummaryPromptBox.Text;
         await _vm.ResummarizeCommand.ExecuteAsync(null);
+    }
+
+    // ファイルリスト: 全選択チェックボックス
+    private void OnFileListSelectAllClick(object sender, RoutedEventArgs e)
+    {
+        _vm.ToggleSelectAll();
+        UpdateFileListUI();
+    }
+
+    // ファイルリスト: ファイル追加ボタン
+    private async void OnFileListAddClick(object sender, RoutedEventArgs e)
+    {
+        var picker = new FileOpenPicker();
+        picker.SuggestedStartLocation = PickerLocationId.MusicLibrary;
+        foreach (var ext in FileImporter.SupportedExtensions)
+            picker.FileTypeFilter.Add(ext);
+
+        var hwnd = GetWindowHandle();
+        if (hwnd != IntPtr.Zero)
+            WinRT.Interop.InitializeWithWindow.Initialize(picker, hwnd);
+
+        var files = await picker.PickMultipleFilesAsync();
+        if (files != null && files.Count > 0)
+        {
+            _vm.AddFilesToList(files.Select(f => f.Path));
+            UpdateFileListUI();
+        }
+    }
+
+    // ファイルリスト: 選択ファイル削除ボタン
+    private void OnFileListRemoveClick(object sender, RoutedEventArgs e)
+    {
+        _vm.RemoveSelectedFiles();
+        UpdateFileListUI();
+    }
+
+    // ファイルリスト: 個別チェックボックス変更
+    private void OnFileListItemCheckChanged(object sender, RoutedEventArgs e)
+    {
+        _vm.UpdateIsAllSelected();
+        UpdateFileListUI();
+    }
+
+    /// ファイルリスト行タップで再生ファイルを切り替え
+    private void OnFileListItemClick(object sender, ItemClickEventArgs e)
+    {
+        if (e.ClickedItem is FileListItem item)
+        {
+            _vm.SelectFileForPlayback(item.AudioFile);
+            UpdateFileInfo();
+        }
+    }
+
+    // ファイルリスト UI の表示更新
+    private void UpdateFileListUI()
+    {
+        FileListPanel.Visibility = _vm.FileList.Count > 0 ? Visibility.Visible : Visibility.Collapsed;
+        FileListView.ItemsSource = null;
+        FileListView.ItemsSource = _vm.FileList;
+        FileListSelectAllCheck.IsChecked = _vm.IsAllSelected;
+        TranscribeButton.IsEnabled = (_vm.AudioFile != null || _vm.FileList.Count > 0) && !_vm.IsTranscribing;
+        TranscriptionLangCombo.IsEnabled = (_vm.AudioFile != null || _vm.FileList.Count > 0) && !_vm.IsTranscribing;
     }
 
     // Error dialog

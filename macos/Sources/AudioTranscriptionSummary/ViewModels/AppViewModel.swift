@@ -44,6 +44,16 @@ class AppViewModel: ObservableObject {
     @Published var isSummarizing: Bool = false
     /// エラーメッセージ（nil の場合はエラーなし）
     @Published var errorMessage: String?
+
+    // MARK: - ファイルリスト（複数ファイル文字起こし用）
+
+    /// 音声文字起こし用のファイルリスト
+    @Published var fileList: [FileListItem] = []
+
+    /// 全ファイルが選択されているかどうか
+    var isAllSelected: Bool {
+        !fileList.isEmpty && fileList.allSatisfy { $0.isSelected }
+    }
     /// 再生中かどうか
     @Published var isPlaying: Bool = false
     /// 現在の再生位置（秒）
@@ -89,6 +99,12 @@ class AppViewModel: ObservableObject {
     /// 音声抽出中かどうか（動画ファイルから音声を取り出し中）
     @Published var isExtractingAudio: Bool = false
 
+    /// 録音開始中フラグ（ボタン無効化用）
+    @Published var isStartingCapture: Bool = false
+
+    /// 録音停止中フラグ（ボタン無効化用）
+    @Published var isStoppingCapture: Bool = false
+
     /// ステータスバー用の進捗値（0.0〜1.0、nil の場合は不定プログレス）
     var statusProgress: Double? {
         if isTranscribing { return transcriptionProgress }
@@ -98,6 +114,8 @@ class AppViewModel: ObservableObject {
 
     /// ステータスバー用の進捗メッセージ
     var statusMessage: String? {
+        if isStartingCapture { return "録音開始中..." }
+        if isStoppingCapture { return "録音停止中..." }
         if isExtractingAudio { return "音声を抽出中..." }
         if isTranscribing { return "文字起こし中... \(Int(transcriptionProgress * 100))%" }
         if isSummarizing { return "要約を生成中..." }
@@ -174,6 +192,12 @@ class AppViewModel: ObservableObject {
         self.exportManager = exportManager
         // システム音声キャプチャのデリゲートを設定
         systemAudioCapture.delegate = self
+        // 分割ファイル確定時にファイルリストへ自動登録
+        systemAudioCapture.onFileSplitCompleted = { [weak self] file in
+            guard let self = self else { return }
+            let item = FileListItem(id: UUID(), audioFile: file, isSelected: true)
+            self.fileList.append(item)
+        }
         // 画面録画のデリゲートを設定
         screenRecorder.delegate = self
         // 追加プロンプトを設定から復元
@@ -416,6 +440,158 @@ class AppViewModel: ObservableObject {
         }
     }
 
+    // MARK: - ファイルリスト操作
+
+    /// ファイルリストにファイルを追加する
+    /// FileImporter で各 URL を読み込み、FileListItem として末尾に追加する
+    /// サポート対象外・破損ファイルはスキップし errorMessage に記録する
+    /// - Parameter urls: 追加するファイルの URL 配列
+    func addFilesToList(_ urls: [URL]) async {
+        var errors: [String] = []
+        for url in urls {
+            do {
+                let file = try await fileImporter.importFile(from: url)
+                let item = FileListItem(id: UUID(), audioFile: file, isSelected: true)
+                fileList.append(item)
+            } catch {
+                let msg = "\(url.lastPathComponent): \(error.localizedDescription)"
+                errors.append(msg)
+            }
+        }
+        if !errors.isEmpty {
+            errorMessage = "一部のファイルを追加できませんでした:\n" + errors.joined(separator: "\n")
+        }
+    }
+
+    /// ファイルリストの全選択/全解除をトグルする
+    /// 全ファイルが未選択の場合は全選択、1つ以上選択されている場合は全解除
+    func toggleSelectAll() {
+        let hasAnySelected = fileList.contains { $0.isSelected }
+        for i in fileList.indices {
+            fileList[i].isSelected = !hasAnySelected
+        }
+    }
+
+    /// ファイルリストから指定された ID のファイルを削除する
+    /// - Parameter ids: 削除するファイルの ID セット
+    func removeFilesFromList(_ ids: Set<UUID>) {
+        fileList.removeAll { ids.contains($0.id) }
+    }
+
+    /// ファイルリストの行タップで再生ファイルを切り替える
+    func selectFileForPlayback(_ file: AudioFile) {
+        audioFile = file
+        do {
+            try audioPlayer.load(audioFile: file)
+            stopPlayback()
+        } catch {
+            ErrorLogger.saveErrorLog(error: error, operation: "プレーヤー読み込み",
+                                     context: ["file": file.url.path])
+        }
+    }
+
+    // MARK: - 複数ファイル一括文字起こし
+
+    /// ファイルリストで選択されたファイルを逐次文字起こしし、結果を結合する
+    /// 各ファイルの進捗を個別に追跡し、全体進捗を (i + p) / N で計算する
+    /// エラーが発生したファイルはスキップし、残りのファイルの文字起こしを継続する
+    /// - Parameter language: 文字起こしに使用する言語
+    func transcribeMultipleFiles(language: TranscriptionLanguage) async {
+        let selectedFiles = fileList.filter { $0.isSelected }
+        guard !selectedFiles.isEmpty else { return }
+
+        // 状態をリセット
+        errorMessage = nil
+        isTranscribing = true
+        transcriptionProgress = 0
+        transcript = nil
+        summary = nil
+
+        let totalCount = Double(selectedFiles.count)
+        var results: [String] = []
+        var errors: [String] = []
+
+        for (index, item) in selectedFiles.enumerated() {
+            let i = Double(index)
+
+            do {
+                let result = try await transcriber.transcribe(
+                    audioFile: item.audioFile,
+                    language: language,
+                    onProgress: { [weak self] progress in
+                        Task { @MainActor [weak self] in
+                            // 全体進捗: (i + p) / N
+                            self?.transcriptionProgress = (i + progress) / totalCount
+                        }
+                    }
+                )
+                results.append(result.text)
+            } catch {
+                let msg = "\(item.audioFile.fileName): \(error.localizedDescription)"
+                errors.append(msg)
+            }
+
+            // ファイル完了時の進捗更新
+            transcriptionProgress = (i + 1) / totalCount
+        }
+
+        // エラーメッセージの記録
+        if !errors.isEmpty {
+            errorMessage = "一部のファイルで文字起こしに失敗しました:\n" + errors.joined(separator: "\n")
+        }
+
+        // 結果テキストをファイル順に結合して transcript にセット
+        if !results.isEmpty {
+            let combinedText = results.joined(separator: "\n")
+            let firstFile = selectedFiles.first!.audioFile
+            transcript = Transcript(
+                id: UUID(),
+                audioFileId: firstFile.id,
+                text: combinedText,
+                language: language,
+                createdAt: Date()
+            )
+        }
+
+        transcriptionProgress = 1.0
+        isTranscribing = false
+
+        // 結合結果を .transcript.txt ファイルとして保存（エクスポート先が設定済みの場合）
+        if let exportDir = AWSSettingsViewModel.exportDirectory, let transcript = transcript {
+            let baseName = selectedFiles.first?.audioFile.fileName ?? "transcript"
+            let transcriptURL = exportDir.appendingPathComponent("\(baseName).transcript.txt")
+            do {
+                if !FileManager.default.fileExists(atPath: exportDir.path) {
+                    try FileManager.default.createDirectory(at: exportDir, withIntermediateDirectories: true)
+                }
+                try transcript.text.write(to: transcriptURL, atomically: true, encoding: .utf8)
+                lastTranscriptPath = transcriptURL.path
+            } catch {
+                errorMessage = (errorMessage ?? "") + "\n文字起こしファイルの保存に失敗しました: \(error.localizedDescription)"
+            }
+        }
+
+        // 要約も自動実行する
+        if transcript != nil {
+            await startSummarization()
+
+            // 要約結果をファイルに保存
+            if let exportDir = AWSSettingsViewModel.exportDirectory, let summary = summary {
+                let baseName = selectedFiles.first?.audioFile.fileName ?? "transcript"
+                let summaryURL = exportDir.appendingPathComponent("\(baseName).summary.txt")
+                do {
+                    if !FileManager.default.fileExists(atPath: exportDir.path) {
+                        try FileManager.default.createDirectory(at: exportDir, withIntermediateDirectories: true)
+                    }
+                    try summary.text.write(to: summaryURL, atomically: true, encoding: .utf8)
+                    lastSummaryPath = summaryURL.path
+                } catch {
+                    // 保存失敗は致命的ではない
+                }
+            }
+        }
+    }
+
     // MARK: - エクスポート
 
     /// 結果をエクスポートする
@@ -554,6 +730,7 @@ class AppViewModel: ObservableObject {
     /// システム音声のキャプチャを開始する（選択中の音源を使用）
     func startSystemAudioCapture() async {
         errorMessage = nil
+        isStartingCapture = true
         // ファイル選択をクリア
         audioFile = nil
         transcript = nil
@@ -563,39 +740,56 @@ class AppViewModel: ObservableObject {
         do {
             try await systemAudioCapture.startCapture(sourceType: selectedAudioSource)
             isCapturingSystemAudio = true
+            isStartingCapture = false
         } catch let error as AppError {
+            isStartingCapture = false
             errorMessage = (error.errorDescription ?? error.localizedDescription)
                 .replacingOccurrences(of: "文字起こしに失敗しました", with: "録音に失敗しました")
         } catch {
+            isStartingCapture = false
             errorMessage = "録音の開始に失敗しました: \(error.localizedDescription)"
         }
     }
 
     /// システム音声のキャプチャを停止し、録音ファイルを保存する（文字起こしは自動実行しない）
-    /// RAW 形式で保存（変換は一時的に無効）
+    /// 分割された全ファイルを取得し、最初のファイルを audioFile にセットする
     func stopSystemAudioCapture() async {
+        isStoppingCapture = true
         convertingStatus = .saving
         do {
             isCapturingSystemAudio = false
             captureAudioLevel = 0
 
-            let capturedFile = try await systemAudioCapture.stopCapture()
+            let capturedFiles = try await systemAudioCapture.stopCapture()
 
-            audioFile = capturedFile
+            // 最初の分割ファイルを audioFile にセット（互換性維持）
+            if let firstFile = capturedFiles.first {
+                audioFile = firstFile
+            }
             transcript = nil
             summary = nil
             transcriptionProgress = 0
 
-            // 音声プレーヤーへの読み込み（MOV の Float32 PCM は再生できない場合がある）
-            do {
-                try audioPlayer.load(audioFile: capturedFile)
-            } catch {
-                ErrorLogger.saveErrorLog(error: error, operation: "録音_プレーヤー読み込み",
-                                         context: ["file": capturedFile.url.path,
-                                                    "ext": capturedFile.fileExtension])
+            // 音声プレーヤーへの読み込み（最初のファイルを使用）
+            if let firstFile = capturedFiles.first {
+                do {
+                    try audioPlayer.load(audioFile: firstFile)
+                } catch {
+                    ErrorLogger.saveErrorLog(error: error, operation: "録音_プレーヤー読み込み",
+                                             context: ["file": firstFile.url.path,
+                                                        "ext": firstFile.fileExtension])
+                }
             }
             stopPlayback()
+
+            // 全分割ファイルを fileList に追加（isSelected: true）
+            let newItems = capturedFiles.map { file in
+                FileListItem(id: UUID(), audioFile: file, isSelected: true)
+            }
+            fileList.append(contentsOf: newItems)
+
             convertingStatus = .completed
+            isStoppingCapture = false
 
             Task {
                 try? await Task.sleep(nanoseconds: 2_000_000_000)
@@ -605,6 +799,7 @@ class AppViewModel: ObservableObject {
             convertingStatus = .idle
             isCapturingSystemAudio = false
             captureAudioLevel = 0
+            isStoppingCapture = false
             errorMessage = (error.errorDescription ?? error.localizedDescription)
                 .replacingOccurrences(of: "文字起こしに失敗しました", with: "録音に失敗しました")
             ErrorLogger.saveErrorLog(error: error, operation: "録音保存",
@@ -613,6 +808,7 @@ class AppViewModel: ObservableObject {
             convertingStatus = .idle
             isCapturingSystemAudio = false
             captureAudioLevel = 0
+            isStoppingCapture = false
             errorMessage = "録音に失敗しました: \(error.localizedDescription)"
             ErrorLogger.saveErrorLog(error: error, operation: "録音保存",
                                      context: ["sourceType": "\(selectedAudioSource)"])
@@ -631,6 +827,7 @@ class AppViewModel: ObservableObject {
     /// 画面録画を開始する
     func startScreenRecording() async {
         errorMessage = nil
+        isStartingCapture = true
         // ファイル選択をクリア
         audioFile = nil
         transcript = nil
@@ -640,6 +837,7 @@ class AppViewModel: ObservableObject {
         do {
             try await screenRecorder.startRecording()
             isRecordingScreen = true
+            isStartingCapture = false
             // プレビューフレーム更新タイマー（0.1秒間隔）
             previewTimer = Timer.scheduledTimer(withTimeInterval: 0.1, repeats: true) { [weak self] _ in
                 Task { @MainActor [weak self] in
@@ -650,15 +848,18 @@ class AppViewModel: ObservableObject {
                 }
             }
         } catch let error as AppError {
+            isStartingCapture = false
             errorMessage = (error.errorDescription ?? error.localizedDescription)
                 .replacingOccurrences(of: "文字起こしに失敗しました", with: "録画の開始に失敗しました")
         } catch {
+            isStartingCapture = false
             errorMessage = "録画の開始に失敗しました: \(error.localizedDescription)"
         }
     }
 
     /// 画面録画を停止し、RAW 形式で保存する（変換は一時的に無効、文字起こしは自動実行しない）
     func stopScreenRecording() async {
+        isStoppingCapture = true
         convertingStatus = .saving
         do {
             isRecordingScreen = false
@@ -680,6 +881,7 @@ class AppViewModel: ObservableObject {
             }
             stopPlayback()
             convertingStatus = .completed
+            isStoppingCapture = false
 
             Task {
                 try? await Task.sleep(nanoseconds: 2_000_000_000)
@@ -688,6 +890,7 @@ class AppViewModel: ObservableObject {
         } catch let error as AppError {
             convertingStatus = .idle
             isRecordingScreen = false
+            isStoppingCapture = false
             errorMessage = (error.errorDescription ?? error.localizedDescription)
                 .replacingOccurrences(of: "文字起こしに失敗しました", with: "録画の保存に失敗しました")
             ErrorLogger.saveErrorLog(error: error, operation: "録画保存",
@@ -695,6 +898,7 @@ class AppViewModel: ObservableObject {
         } catch {
             convertingStatus = .idle
             isRecordingScreen = false
+            isStoppingCapture = false
             errorMessage = "録画の保存に失敗しました: \(error.localizedDescription)"
             ErrorLogger.saveErrorLog(error: error, operation: "録画保存",
                                      context: ["saveMode": "videoAndAudio"])

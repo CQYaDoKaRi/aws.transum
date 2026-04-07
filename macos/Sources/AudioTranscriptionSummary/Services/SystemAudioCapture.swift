@@ -31,6 +31,19 @@ final class SystemAudioCapture: NSObject, @unchecked Sendable {
     private let lock = NSLock()
     private var sessionStarted = false
 
+    /// 録音分割マネージャー（1分ごとにファイルを分割）
+    private var splitManager: SplitRecordingManager?
+    /// 分割ファイルごとの録音開始時刻
+    private var splitStartTime: Date?
+
+    /// AAC エンコード設定（分割時の AVAssetWriter 再作成に使用）
+    private let audioSettings: [String: Any] = [
+        AVFormatIDKey: kAudioFormatMPEG4AAC,
+        AVSampleRateKey: 48000,
+        AVNumberOfChannelsKey: 2,
+        AVEncoderBitRateKey: 128_000
+    ]
+
     /// マイク録音用の AVCaptureSession
     private var captureSession: AVCaptureSession?
     /// マイク録音用の AVCaptureAudioDataOutput
@@ -65,19 +78,17 @@ final class SystemAudioCapture: NSObject, @unchecked Sendable {
             try FileManager.default.createDirectory(at: saveDir, withIntermediateDirectories: true)
         }
         let dateStr = Self.fileNameFormatter.string(from: Date())
-        // 最終保存先に直接書き込む（一時ファイルを経由しない）
-        let finalM4A = saveDir.appendingPathComponent("\(dateStr).m4a")
-        finalFileURL = finalM4A
 
-        // AVAssetWriter を準備（AAC で直接 M4A に書き込み）
-        let writer = try AVAssetWriter(outputURL: finalM4A, fileType: .m4a)
-        // AAC エンコード設定で AVAssetWriterInput を事前に作成
-        let audioSettings: [String: Any] = [
-            AVFormatIDKey: kAudioFormatMPEG4AAC,
-            AVSampleRateKey: 48000,
-            AVNumberOfChannelsKey: 2,
-            AVEncoderBitRateKey: 128_000
-        ]
+        // SplitRecordingManager を初期化（1分分割）
+        let manager = SplitRecordingManager(baseName: dateStr, outputDirectory: saveDir)
+        splitManager = manager
+
+        // 最初の分割ファイル URL を取得
+        let firstFileURL = manager.nextFileURL()
+        finalFileURL = firstFileURL
+
+        // 最初の AVAssetWriter を準備（AAC で直接 M4A に書き込み）
+        let writer = try AVAssetWriter(outputURL: firstFileURL, fileType: .m4a)
         let input = AVAssetWriterInput(mediaType: .audio, outputSettings: audioSettings)
         input.expectsMediaDataInRealTime = true
         writer.add(input)
@@ -90,6 +101,13 @@ final class SystemAudioCapture: NSObject, @unchecked Sendable {
         // isCapturing を先に true にする（SCStreamOutput コールバックが書き込みを開始できるように）
         isCapturing = true
         captureStartTime = Date()
+        splitStartTime = Date()
+
+        // 分割タイマーを開始（60秒ごとに AVAssetWriter を切り替え）
+        manager.startSplitting { [weak self] nextURL in
+            guard let self = self else { return }
+            self.switchAssetWriter(to: nextURL)
+        }
 
         if sourceType.isMicrophone {
             await stopMonitoring()
@@ -121,6 +139,89 @@ final class SystemAudioCapture: NSObject, @unchecked Sendable {
         }
 
         await MainActor.run { [weak self] in self?.delegate?.captureDidStart() }
+    }
+
+    // MARK: - AVAssetWriter 切り替え（分割時）
+
+    /// 現在の AVAssetWriter と AudioInput をロック保護下で取り出し、nil にリセットする
+    /// async コンテキストから NSLock を直接呼べないため、nonisolated な同期メソッドとして分離
+    private nonisolated func detachCurrentWriter() -> (AVAssetWriter?, AVAssetWriterInput?) {
+        lock.lock()
+        let w = assetWriter
+        let i = audioInput
+        assetWriter = nil
+        audioInput = nil
+        lock.unlock()
+        return (w, i)
+    }
+
+    /// 現在の AVAssetWriter を確定し、新しいファイルで AVAssetWriter を開始する
+    /// ロックで保護し、分割切り替え中の音声バッファ欠落を最小限にする
+    /// - Parameter nextURL: 次の分割ファイルの URL
+    /// 分割ファイル確定時のコールバック（録音中にファイルリストへ自動登録するため）
+    var onFileSplitCompleted: ((AudioFile) -> Void)?
+
+    private func switchAssetWriter(to nextURL: URL) {
+        lock.lock()
+        let oldWriter = assetWriter
+        let oldInput = audioInput
+        let oldURL = finalFileURL
+        assetWriter = nil
+        audioInput = nil
+        sessionStarted = false
+        lock.unlock()
+
+        oldInput?.markAsFinished()
+        if let oldWriter = oldWriter {
+            oldWriter.finishWriting { [weak self] in
+                guard let self = self else { return }
+
+                // 確定した分割ファイルを AudioFile として通知
+                if let url = oldURL {
+                    Task { @MainActor [weak self] in
+                        guard let self = self else { return }
+                        let asset = AVAsset(url: url)
+                        let duration: TimeInterval
+                        if #available(macOS 12.0, *) {
+                            duration = (try? await asset.load(.duration).seconds) ?? 0
+                        } else {
+                            duration = asset.duration.seconds
+                        }
+                        let attrs = try? FileManager.default.attributesOfItem(atPath: url.path)
+                        let size = attrs?[.size] as? Int64 ?? 0
+                        if size > 0 {
+                            let file = AudioFile(
+                                id: UUID(), url: url,
+                                fileName: url.deletingPathExtension().lastPathComponent,
+                                fileExtension: "m4a", duration: duration,
+                                fileSize: size, createdAt: Date()
+                            )
+                            self.onFileSplitCompleted?(file)
+                        }
+                    }
+                }
+
+                do {
+                    let newWriter = try AVAssetWriter(outputURL: nextURL, fileType: .m4a)
+                    let newInput = AVAssetWriterInput(mediaType: .audio, outputSettings: self.audioSettings)
+                    newInput.expectsMediaDataInRealTime = true
+                    newWriter.add(newInput)
+                    newWriter.startWriting()
+                    newWriter.startSession(atSourceTime: .zero)
+
+                    self.lock.lock()
+                    self.assetWriter = newWriter
+                    self.audioInput = newInput
+                    self.sessionStarted = false
+                    self.splitStartTime = Date()
+                    self.finalFileURL = nextURL
+                    self.lock.unlock()
+                } catch {
+                    ErrorLogger.saveErrorLog(error: error, operation: "録音分割_Writer作成失敗",
+                                             context: ["nextURL": nextURL.path])
+                }
+            }
+        }
     }
 
     /// マイク録音を開始する（AVCaptureSession）
@@ -218,11 +319,14 @@ final class SystemAudioCapture: NSObject, @unchecked Sendable {
 
     // MARK: - キャプチャ停止
 
-    func stopCapture() async throws -> AudioFile {
+    func stopCapture() async throws -> [AudioFile] {
         guard isCapturing else {
             throw NSError(domain: "SystemAudioCapture", code: -2,
                           userInfo: [NSLocalizedDescriptionKey: "キャプチャが開始されていません"])
         }
+
+        // 分割タイマーを停止
+        splitManager?.stopSplitting()
 
         // マイク録音の場合は AVCaptureSession を停止、SCStream は触らない
         if currentSourceType.isMicrophone {
@@ -235,48 +339,80 @@ final class SystemAudioCapture: NSObject, @unchecked Sendable {
             }
         }
         stream = nil
-        audioInput?.markAsFinished()
 
-        if let writer = assetWriter {
+        // 現在書き込み中の AVAssetWriter を確定（同期メソッドでロック操作）
+        let (currentWriter, currentInput) = detachCurrentWriter()
+
+        currentInput?.markAsFinished()
+        if let writer = currentWriter {
             await writer.finishWriting()
         }
+
         isCapturing = false
         await MainActor.run { [weak self] in self?.delegate?.captureDidStop() }
 
-        guard let finalM4A = finalFileURL else {
+        // 分割ファイル一覧から AudioFile 配列を生成
+        guard let manager = splitManager else {
             let err = NSError(domain: "SystemAudioCapture", code: -5,
                               userInfo: [NSLocalizedDescriptionKey: "録音ファイルのパスが設定されていません"])
-            ErrorLogger.saveErrorLog(error: err, operation: "録音保存", context: ["finalFileURL": finalFileURL?.path ?? "nil"])
+            ErrorLogger.saveErrorLog(error: err, operation: "録音保存", context: ["splitManager": "nil"])
             throw err
         }
 
-        let fileExists = FileManager.default.fileExists(atPath: finalM4A.path)
-        let fileAttrs = try? FileManager.default.attributesOfItem(atPath: finalM4A.path)
-        let fileSize = fileAttrs?[.size] as? Int64 ?? 0
+        var audioFiles: [AudioFile] = []
+        for fileURL in manager.splitFiles {
+            let fileExists = FileManager.default.fileExists(atPath: fileURL.path)
+            let fileAttrs = try? FileManager.default.attributesOfItem(atPath: fileURL.path)
+            let fileSize = fileAttrs?[.size] as? Int64 ?? 0
 
-        guard fileExists, fileSize > 0 else {
-            try? FileManager.default.removeItem(at: finalM4A)
-            assetWriter = nil; audioInput = nil
+            // 空ファイルや存在しないファイルはスキップ
+            guard fileExists, fileSize > 0 else {
+                try? FileManager.default.removeItem(at: fileURL)
+                continue
+            }
 
+            // AVAsset から duration を取得
+            let asset = AVAsset(url: fileURL)
+            let duration: TimeInterval
+            if #available(macOS 12.0, *) {
+                duration = (try? await asset.load(.duration).seconds) ?? 0
+            } else {
+                duration = asset.duration.seconds
+            }
+
+            let audioFile = AudioFile(
+                id: UUID(),
+                url: fileURL,
+                fileName: fileURL.deletingPathExtension().lastPathComponent,
+                fileExtension: "m4a",
+                duration: duration,
+                fileSize: fileSize,
+                createdAt: Date()
+            )
+            audioFiles.append(audioFile)
+        }
+
+        // 有効な分割ファイルが1つもない場合はエラー
+        guard !audioFiles.isEmpty else {
             let err = NSError(domain: "SystemAudioCapture", code: -8,
                               userInfo: [NSLocalizedDescriptionKey: "音声データが検出されませんでした。録音中に音声が再生されていたか確認してください。"])
             ErrorLogger.saveErrorLog(
                 error: err,
                 operation: "録音_音声データなし",
-                context: ["finalM4A": finalM4A.path, "size": "0", "sourceType": "\(currentSourceType)"])
+                context: ["splitFiles": "\(manager.splitFiles.count)", "sourceType": "\(currentSourceType)"])
             throw AppError.transcriptionFailed(underlying: err)
         }
 
-        let duration = Date().timeIntervalSince(captureStartTime ?? Date())
-        let audioFile = AudioFile(id: UUID(), url: finalM4A, fileName: finalM4A.deletingPathExtension().lastPathComponent,
-                                  fileExtension: "m4a", duration: duration, fileSize: fileSize, createdAt: Date())
-        assetWriter = nil; audioInput = nil
-        return audioFile
+        splitManager = nil
+        return audioFiles
     }
 
     // MARK: - キャンセル
 
     func cancelCapture() async {
+        // 分割タイマーを停止
+        splitManager?.stopSplitting()
+
         if currentSourceType.isMicrophone {
             captureSession?.stopRunning()
             captureSession = nil; captureOutput = nil
@@ -284,11 +420,23 @@ final class SystemAudioCapture: NSObject, @unchecked Sendable {
             if let s = stream { try? await s.stopCapture() }
         }
         stream = nil
-        audioInput?.markAsFinished()
-        await assetWriter?.finishWriting()
+
+        let (currentWriter, currentInput) = detachCurrentWriter()
+        currentInput?.markAsFinished()
+        await currentWriter?.finishWriting()
+
+        // 分割中の全ファイルを削除
+        if let manager = splitManager {
+            for fileURL in manager.splitFiles {
+                try? FileManager.default.removeItem(at: fileURL)
+            }
+        }
+        // 旧来の finalFileURL も念のため削除
         if let url = finalFileURL { try? FileManager.default.removeItem(at: url) }
+
         isCapturing = false
-        assetWriter = nil; audioInput = nil; finalFileURL = nil
+        splitManager = nil
+        finalFileURL = nil
         await MainActor.run { [weak self] in self?.delegate?.captureDidStop() }
     }
 

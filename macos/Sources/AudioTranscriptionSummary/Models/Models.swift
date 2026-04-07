@@ -114,3 +114,38 @@ struct Summary: Equatable {
     /// 作成日時
     let createdAt: Date
 }
+
+// MARK: - FileListItem（ファイルリスト表示用ラッパー）
+
+/// 音声文字起こしセクションのファイルリストに表示する項目
+/// AudioFile をラップし、選択状態と表示用の計算プロパティを提供する
+struct FileListItem: Identifiable {
+    /// 一意な識別子
+    let id: UUID
+    /// 音声ファイル情報
+    let audioFile: AudioFile
+    /// 選択状態（チェックボックス用）
+    var isSelected: Bool
+
+    /// 再生時間の表示テキスト（"01:00" 形式）
+    var durationText: String {
+        let totalSeconds = Int(audioFile.duration)
+        let minutes = totalSeconds / 60
+        let seconds = totalSeconds % 60
+        return String(format: "%02d:%02d", minutes, seconds)
+    }
+
+    /// ファイルサイズの表示テキスト（"1.2 MB" 形式）
+    var fileSizeText: String {
+        let bytes = Double(audioFile.fileSize)
+        if bytes >= 1_073_741_824 {
+            return String(format: "%.1f GB", bytes / 1_073_741_824)
+        } else if bytes >= 1_048_576 {
+            return String(format: "%.1f MB", bytes / 1_048_576)
+        } else if bytes >= 1024 {
+            return String(format: "%.1f KB", bytes / 1024)
+        } else {
+            return "\(Int(bytes)) B"
+        }
+    }
+}

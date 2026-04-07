@@ -31,6 +31,9 @@
 - 全テキストエリアにコピーボタン
 - 全セクション折りたたみ可能
 - 折りたたみセクション自動開閉連動（録音開始/停止、ファイル選択に応じて自動制御）
+- 録音中の UI 制御（設定ボタン・ファイル操作・要約ファイルボタン無効化）
+- 録音経過時間のステータスバー表示
+- リアルタイム文字起こしの有効/無効切り替え（録音中でも切り替え可能、ストリーム出力ファイルへの追記対応）
 - カスタムアプリアイコン（波形＋ドキュメント＋Tデザイン）
 - CPU・メモリ使用状況リアルタイム表示
 
@@ -51,4 +54,5 @@
 
 | OS | ビルド | 実行 |
 |----|--------|------|
+| macOS | `cd macos && swift build` | `cd macos && swift test` |
 | Windows | `MSBuild test/windows/AudioTranscriptionSummary.Tests/AudioTranscriptionSummary.Tests.csproj /p:Configuration=Release /p:Platform=x64 /restore` | `dotnet test test/windows/AudioTranscriptionSummary.Tests/ --no-build -c Release -p:Platform=x64` |

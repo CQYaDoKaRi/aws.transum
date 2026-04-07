@@ -97,6 +97,7 @@ struct MainView: View {
         // 設定（右端）
         ToolbarItem(placement: .primaryAction) {
             Button { showSettings = true } label: { Label("設定", systemImage: "gearshape") }
+                .disabled(isAnyCapturing)
         }
     }
 
@@ -141,13 +142,27 @@ struct MainView: View {
                                         isTranscriptExpanded = false
                                         isSummaryExpanded = false
                                     }
+                                    // 録音中なら文字起こし・翻訳を開始（ストリーム出力ファイルがあれば追記）
+                                    if isAnyCapturing {
+                                        Task {
+                                            await realtimeVM.startStreaming()
+                                            viewModel.setRealtimeAudioCallback { [weak realtimeVM] buffer in realtimeVM?.sendAudioBuffer(buffer) }
+                                        }
+                                    }
                                 } else {
                                     withAnimation(.easeInOut(duration: 0.2)) {
                                         isRealtimeExpanded = false
                                         isTranscriptExpanded = true
                                         isSummaryExpanded = true
                                     }
+                                    // ストリーミング停止、テキストクリア
                                     realtimeVM.stopStreaming()
+                                    viewModel.setRealtimeAudioCallback(nil)
+                                    realtimeVM.finalText = ""
+                                    realtimeVM.partialText = ""
+                                    realtimeVM.detectedLanguage = nil
+                                    realtimeVM.errorMessage = nil
+                                    realtimeTranslationVM.reset()
                                 }
                             }
                     }
@@ -205,13 +220,13 @@ struct MainView: View {
 
                 collapsibleSection(title: "音声文字起こし", icon: "waveform", isExpanded: $isTranscriptExpanded) {
                     VStack(spacing: 0) {
-                        FileDropZone(viewModel: viewModel) {
+                        FileDropZone(viewModel: viewModel, onFileSelected: {
                             // ファイル選択時: 入力とリアルタイムを閉じる
                             withAnimation(.easeInOut(duration: 0.2)) {
                                 isInputExpanded = false
                                 isRealtimeExpanded = false
                             }
-                        }.padding(.horizontal, 8).padding(.top, 4).padding(.bottom, 2)
+                        }, isDisabled: isAnyCapturing).padding(.horizontal, 8).padding(.top, 4).padding(.bottom, 2)
                         AudioPlayerView(viewModel: viewModel).padding(.horizontal, 8).padding(.vertical, 2)
                         Divider()
                         HStack(spacing: 0) {
@@ -268,6 +283,7 @@ struct MainView: View {
                                             .font(.caption).frame(maxWidth: .infinity)
                                     }
                                     .controlSize(.small)
+                                    .disabled(isAnyCapturing)
                                     Button {
                                         Task { await viewModel.resummarize() }
                                     } label: {

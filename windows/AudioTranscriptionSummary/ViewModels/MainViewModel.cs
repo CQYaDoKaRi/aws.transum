@@ -564,6 +564,24 @@ public partial class MainViewModel : ObservableObject
         }
     }
 
+    /// <summary>
+    /// リアルタイム文字起こしを停止する（トグル無効化時に使用）
+    /// </summary>
+    public void StopRealtimeStreaming()
+    {
+        _audioCaptureService.DataAvailable -= OnAudioDataForStreaming;
+        _realtimeClient?.StopStreaming();
+        CleanupRealtimeClient();
+    }
+
+    /// <summary>
+    /// 録音中にリアルタイム文字起こしを有効化した場合のストリーミング開始（public）
+    /// </summary>
+    public async Task StartRealtimeStreamingPublicAsync(AppSettings settings)
+    {
+        await StartRealtimeStreamingAsync(settings);
+    }
+
     [RelayCommand]
     private void TogglePlayback()
     {

@@ -685,7 +685,7 @@ public sealed partial class MainPage : Page
     }
 
     /// リアルタイム文字起こしトグル変更時
-    private void OnRealtimeToggled(object sender, RoutedEventArgs e)
+    private async void OnRealtimeToggled(object sender, RoutedEventArgs e)
     {
         var store = new SettingsStore();
         var s = store.Load();
@@ -698,13 +698,39 @@ public sealed partial class MainPage : Page
             RealtimeSection.IsExpanded = true;
             TranscriptSection.IsExpanded = false;
             SummarySection.IsExpanded = false;
+
+            // 録音中ならリアルタイム文字起こし・翻訳を開始（ストリーム出力ファイルがあれば追記）
+            if (_vm.IsCapturing)
+            {
+                try { await StartRealtimeStreamingFromToggle(s); }
+                catch (Exception ex) { _vm.RealtimeTranscriptionVM.ErrorMessage = $"ストリーミング開始エラー: {ex.Message}"; }
+            }
         }
         else
         {
             RealtimeSection.Visibility = Visibility.Collapsed;
             TranscriptSection.IsExpanded = true;
             SummarySection.IsExpanded = true;
+
+            // ストリーミング停止、テキストクリア
+            _vm.StopRealtimeStreaming();
+            _vm.RealtimeTranscriptionVM.FinalText = "";
+            _vm.RealtimeTranscriptionVM.PartialText = "";
+            _vm.RealtimeTranscriptionVM.DetectedLanguage = null;
+            _vm.RealtimeTranscriptionVM.ErrorMessage = null;
+            RealtimeFinalRun.Text = "";
+            RealtimePartialRun.Text = "";
+            CopyRealtimeBtn.IsEnabled = false;
+            _vm.RealtimeTranslationVM.Reset();
+            RealtimeTranslationText.Text = "";
+            CopyRealtimeTransBtn.IsEnabled = false;
         }
+    }
+
+    /// 録音中にリアルタイム文字起こしを有効化した場合のストリーミング開始
+    private async Task StartRealtimeStreamingFromToggle(AppSettings settings)
+    {
+        await _vm.StartRealtimeStreamingPublicAsync(settings);
     }
 
     // Translation handlers

@@ -11,11 +11,21 @@ struct StatusBarView: View {
     @State private var appMemory: UInt64 = 0
     @State private var totalMemory: UInt64 = ProcessInfo.processInfo.physicalMemory
     @State private var timer: Timer?
+    @State private var recordingElapsed: TimeInterval = 0
+
+    /// 録音中かどうか
+    private var isAnyCapturing: Bool {
+        viewModel.isCapturingSystemAudio || viewModel.isRecordingScreen
+    }
 
     var body: some View {
         HStack(spacing: 16) {
-            // 左寄せ: プログレスバー＋メッセージ
-            if let message = viewModel.statusMessage {
+            // 左寄せ: プログレスバー＋メッセージ or 録音時間
+            if isAnyCapturing {
+                Circle().fill(.red).frame(width: 6, height: 6)
+                Text(String(format: "録音中 %02d:%02d", Int(recordingElapsed) / 60, Int(recordingElapsed) % 60))
+                    .font(.caption2).monospacedDigit().foregroundStyle(.red)
+            } else if let message = viewModel.statusMessage {
                 if let progress = viewModel.statusProgress {
                     ProgressView(value: progress)
                         .frame(width: 120)
@@ -49,6 +59,9 @@ struct StatusBarView: View {
         .background(Color(.controlBackgroundColor).opacity(0.5))
         .onAppear { startMonitoring() }
         .onDisappear { timer?.invalidate(); timer = nil }
+        .onChange(of: isAnyCapturing) { _, capturing in
+            if capturing { recordingElapsed = 0 }
+        }
     }
 
     private func startMonitoring() {
@@ -62,6 +75,7 @@ struct StatusBarView: View {
         appCpuUsage = Self.getProcessCPUUsage()
         systemCpuUsage = Self.getSystemCPUUsage()
         appMemory = Self.getProcessMemoryUsage()
+        if isAnyCapturing { recordingElapsed += 2.0 }
     }
 
     // MARK: - アプリの CPU 使用率

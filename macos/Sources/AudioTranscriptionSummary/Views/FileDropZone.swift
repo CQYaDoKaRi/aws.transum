@@ -9,6 +9,8 @@ struct FileDropZone: View {
     @ObservedObject var viewModel: AppViewModel
     /// ファイル選択時に呼ばれるコールバック（折りたたみ連動用）
     var onFileSelected: (() -> Void)?
+    /// 無効状態（録音中など）
+    var isDisabled: Bool = false
     @State private var isFileImporterPresented = false
     @State private var isDragOver = false
 
@@ -22,9 +24,10 @@ struct FileDropZone: View {
                 dropGuidanceView
             }
         }
-        .onDrop(of: [.fileURL], isTargeted: $isDragOver) { handleDrop(providers: $0) }
+        .onDrop(of: [.fileURL], isTargeted: $isDragOver) { isDisabled ? false : handleDrop(providers: $0) }
         .fileImporter(isPresented: $isFileImporterPresented, allowedContentTypes: Self.supportedTypes, allowsMultipleSelection: false) { handleFileImporterResult($0) }
         .keyboardShortcut("o", modifiers: .command)
+        .opacity(isDisabled ? 0.5 : 1.0)
     }
 
     // MARK: - ファイル情報表示
@@ -58,6 +61,7 @@ struct FileDropZone: View {
                 Label("別のファイル", systemImage: "folder").font(.caption2)
             }
             .controlSize(.small)
+            .disabled(isDisabled)
         }
         .padding(.horizontal, 10)
         .padding(.vertical, 6)
@@ -91,6 +95,7 @@ struct FileDropZone: View {
                 Label("ファイルを選択", systemImage: "folder").font(.caption2)
             }
             .controlSize(.small)
+            .disabled(isDisabled)
         }
         .padding(.horizontal, 10)
         .padding(.vertical, 8)

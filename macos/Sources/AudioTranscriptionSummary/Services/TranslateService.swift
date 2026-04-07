@@ -12,7 +12,10 @@ final class TranslateService: Sendable {
 
     private let maxRetries = 3
 
-    /// テキストを翻訳する
+    /// Amazon Translate の1リクエストあたりの最大バイト数（UTF-8）
+    private let maxBytesPerRequest = 9500 // 安全マージンを持たせて9500バイト
+
+    /// テキストを翻訳する（文字数制限を超える場合は文単位で分割翻訳）
     /// - Parameters:
     ///   - text: 翻訳元テキスト
     ///   - sourceLanguage: 翻訳元言語コード（"auto" で自動判別）
@@ -29,6 +32,63 @@ final class TranslateService: Sendable {
             return ""
         }
 
+        // UTF-8バイト数が制限内ならそのまま翻訳
+        if text.utf8.count <= maxBytesPerRequest {
+            return try await translateChunk(
+                text: text, from: sourceLanguage, to: targetLanguage, region: region
+            )
+        }
+
+        // 文単位で分割して翻訳
+        let chunks = splitBySentences(text: text, maxBytes: maxBytesPerRequest)
+        var results: [String] = []
+        for chunk in chunks {
+            let translated = try await translateChunk(
+                text: chunk, from: sourceLanguage, to: targetLanguage, region: region
+            )
+            results.append(translated)
+        }
+        return results.joined()
+    }
+
+    /// テキストを文単位で分割する（前後の文脈を壊さないように句点・改行で区切る）
+    private func splitBySentences(text: String, maxBytes: Int) -> [String] {
+        // 句点・改行で文を分割
+        let delimiters = CharacterSet(charactersIn: "。！？.!?\n")
+        var sentences: [String] = []
+        var current = ""
+        for char in text {
+            current.append(char)
+            if delimiters.contains(char.unicodeScalars.first!) {
+                sentences.append(current)
+                current = ""
+            }
+        }
+        if !current.isEmpty { sentences.append(current) }
+
+        // 文をチャンクにまとめる（maxBytes以内）
+        var chunks: [String] = []
+        var chunk = ""
+        for sentence in sentences {
+            let combined = chunk + sentence
+            if combined.utf8.count > maxBytes && !chunk.isEmpty {
+                chunks.append(chunk)
+                chunk = sentence
+            } else {
+                chunk = combined
+            }
+        }
+        if !chunk.isEmpty { chunks.append(chunk) }
+        return chunks
+    }
+
+    /// 単一チャンクを翻訳する（指数バックオフ再試行付き）
+    private func translateChunk(
+        text: String,
+        from sourceLanguage: String,
+        to targetLanguage: String,
+        region: String
+    ) async throws -> String {
         let config = try await TranslateClient.TranslateClientConfiguration(
             region: region
         )
@@ -36,7 +96,6 @@ final class TranslateService: Sendable {
 
         var lastError: Error?
 
-        // 指数バックオフによる再試行
         for attempt in 0..<maxRetries {
             do {
                 let input = TranslateTextInput(
@@ -48,7 +107,6 @@ final class TranslateService: Sendable {
                 return output.translatedText ?? ""
             } catch {
                 lastError = error
-                // 指数バックオフ: 1秒, 2秒, 4秒
                 let delay = UInt64(pow(2.0, Double(attempt))) * 1_000_000_000
                 try? await Task.sleep(nanoseconds: delay)
             }

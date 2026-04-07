@@ -143,7 +143,7 @@
 
 #### 受け入れ基準（Acceptance Criteria）
 
-1. THE App SHALL 録音開始前に音源リソースを選択するComboBoxを提供する
+1. THE App SHALL 録音開始前に音源リソースを選択するComboBoxを提供する（ラベルなし）
 2. THE App SHALL 以下の音源種別を選択肢として提供する:
    - システム音声（NAudio WasapiLoopbackCapture）
    - マイク入力（NAudio WaveInEvent、内蔵・外部マイクを含む）
@@ -209,6 +209,7 @@
 3. THE App SHALL コピーボタンを、対応するテキストが空の場合に無効化する
 4. THE App SHALL 翻訳ボタンを、ソーステキストが空の場合に無効化する
 5. THE App SHALL 要約中にProgressRingを表示する
+6. WHILE 録音中の間、THE App SHALL 設定ボタン、ファイル選択ボタン、ドラッグ＆ドロップ、「ファイルから要約」ボタン、「要約」ボタンを無効化する
 
 ### 要件 16: テキストエリアの高さ統一とリサイズ（Text Area Height and Resize）
 
@@ -230,3 +231,23 @@
 2. THE App SHALL 青いグラデーション背景に白い波形バー（音声）、ドキュメントアイコン（文字起こし・要約）、「T」文字（Transcription）を組み合わせたデザインのアイコンを使用する
 3. THE App SHALL System.Drawing.Common でICOファイルを生成し AppWindow.SetIcon で設定する
 4. THE App SHALL 生成したICOファイルを %APPDATA%\AudioTranscriptionSummary\app.ico にキャッシュする
+
+### 要件 18: 録音時間表示（Recording Duration Display）
+
+**ユーザーストーリー:** ユーザーとして、録音中に経過時間を確認したい。
+
+#### 受け入れ基準（Acceptance Criteria）
+
+1. WHILE 録音中の間、THE App SHALL ステータスバーに「音声をキャプチャ中... mm:ss」形式で録音経過時間を表示する
+2. THE App SHALL 録音経過時間を2秒ごとに更新する
+3. WHEN 録音が停止またはキャンセルされた場合、THE App SHALL ステータスバーの録音情報をクリアする
+
+### 要件 19: リアルタイム文字起こしトグル（Realtime Transcription Toggle）
+
+**ユーザーストーリー:** ユーザーとして、メイン画面からリアルタイム文字起こしの有効/無効を切り替えたい。
+
+#### 受け入れ基準（Acceptance Criteria）
+
+1. THE App SHALL 入力セクションにToggleSwitchを配置し、リアルタイム文字起こしの有効/無効を切り替えられるようにする
+2. THE ToggleSwitch SHALL OnContent/OffContentに「リアルタイム文字起こし」を表示する
+3. WHEN トグルが変更された場合、THE App SHALL 設定を保存し、リアルタイムセクションの表示/非表示を切り替える

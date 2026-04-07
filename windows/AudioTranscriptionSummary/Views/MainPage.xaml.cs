@@ -269,6 +269,11 @@ public sealed partial class MainPage : Page
         RecordButton.Visibility = _vm.IsCapturing ? Visibility.Collapsed : Visibility.Visible;
         StopRecordButton.Visibility = _vm.IsCapturing ? Visibility.Visible : Visibility.Collapsed;
         CancelButton.Visibility = _vm.IsCapturing ? Visibility.Visible : Visibility.Collapsed;
+        SettingsButton.IsEnabled = !_vm.IsCapturing;
+        FilePickButton.IsEnabled = !_vm.IsCapturing;
+        DropZone.AllowDrop = !_vm.IsCapturing;
+        SummaryFileBtn.IsEnabled = !_vm.IsCapturing;
+        ResummarizeBtn.IsEnabled = !_vm.IsCapturing;
 
         if (_vm.IsCapturing)
         {
@@ -355,7 +360,14 @@ public sealed partial class MainPage : Page
         var s3Bucket = new TextBox { Header = "S3 バケット名", Text = settings.S3BucketName, Margin = new Thickness(0, 0, 0, 8) };
 
         var recordDirBox = new TextBox { Header = "録音保存先", Text = settings.RecordingDirectoryPath, IsReadOnly = true, HorizontalAlignment = HorizontalAlignment.Stretch };
-        var recordDirBtn = new Button { Content = "📁 フォルダを選択...", HorizontalAlignment = HorizontalAlignment.Left, Margin = new Thickness(0, 4, 0, 8) };
+        var recordDirBtn = new Button { Content = "📁", VerticalAlignment = VerticalAlignment.Bottom, Margin = new Thickness(4, 0, 0, 0) };
+        var recordDirGrid = new Grid { Margin = new Thickness(0, 0, 0, 8) };
+        recordDirGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+        recordDirGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+        Grid.SetColumn(recordDirBox, 0);
+        Grid.SetColumn(recordDirBtn, 1);
+        recordDirGrid.Children.Add(recordDirBox);
+        recordDirGrid.Children.Add(recordDirBtn);
         recordDirBtn.Click += async (_, _) =>
         {
             var fp = new FolderPicker();
@@ -367,7 +379,14 @@ public sealed partial class MainPage : Page
         };
 
         var exportDirBox = new TextBox { Header = "エクスポート保存先", Text = settings.ExportDirectoryPath, IsReadOnly = true, HorizontalAlignment = HorizontalAlignment.Stretch };
-        var exportDirBtn = new Button { Content = "📁 フォルダを選択...", HorizontalAlignment = HorizontalAlignment.Left, Margin = new Thickness(0, 4, 0, 8) };
+        var exportDirBtn = new Button { Content = "📁", VerticalAlignment = VerticalAlignment.Bottom, Margin = new Thickness(4, 0, 0, 0) };
+        var exportDirGrid = new Grid { Margin = new Thickness(0, 0, 0, 8) };
+        exportDirGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+        exportDirGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+        Grid.SetColumn(exportDirBox, 0);
+        Grid.SetColumn(exportDirBtn, 1);
+        exportDirGrid.Children.Add(exportDirBox);
+        exportDirGrid.Children.Add(exportDirBtn);
         exportDirBtn.Click += async (_, _) =>
         {
             var fp = new FolderPicker();
@@ -399,10 +418,10 @@ public sealed partial class MainPage : Page
             VerticalAlignment = VerticalAlignment.Center
         };
 
-        var testConnectionBtn = new Button { Content = "接続テスト", Margin = new Thickness(0, 0, 0, 8) };
+        var testConnectionBtn = new Button { Content = "接続テスト", VerticalAlignment = VerticalAlignment.Center };
         var testProgressRing = new ProgressRing { IsActive = false, Width = 20, Height = 20, Margin = new Thickness(8, 0, 0, 0), VerticalAlignment = VerticalAlignment.Center };
 
-        var connectionPanel = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 0, 0, 8) };
+        var connectionPanel = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 0, 0, 8), VerticalAlignment = VerticalAlignment.Center };
         connectionPanel.Children.Add(testConnectionBtn);
         connectionPanel.Children.Add(testProgressRing);
         connectionPanel.Children.Add(connectionStatusBadge);
@@ -456,7 +475,7 @@ public sealed partial class MainPage : Page
             }
         };
 
-        var panel = new StackPanel { Spacing = 4, MinWidth = 700 };
+        var panel = new StackPanel { Spacing = 4, MinWidth = 1050 };
 
         // グループ: AWS認証情報
         panel.Children.Add(CreateGroupLabel("🔑 AWS 認証情報"));
@@ -468,20 +487,21 @@ public sealed partial class MainPage : Page
 
         // グループ: フォルダ設定
         panel.Children.Add(CreateGroupLabel("📁 フォルダ設定"));
-        panel.Children.Add(recordDirBox);
-        panel.Children.Add(recordDirBtn);
-        panel.Children.Add(exportDirBox);
-        panel.Children.Add(exportDirBtn);
+        panel.Children.Add(recordDirGrid);
+        panel.Children.Add(exportDirGrid);
 
         var dialog = new ContentDialog
         {
             Title = "設定",
-            Content = new ScrollViewer { Content = panel, MaxHeight = 650 },
+            Content = panel,
             PrimaryButtonText = "保存",
             CloseButtonText = "キャンセル",
             XamlRoot = this.XamlRoot,
-            MinWidth = 750
+            MinWidth = 1100,
+            FullSizeDesired = true
         };
+        dialog.Resources["ContentDialogMaxWidth"] = 1200.0;
+        dialog.Resources["ContentDialogMaxHeight"] = 1200.0;
 
         var result = await dialog.ShowAsync();
         if (result == ContentDialogResult.Primary)
@@ -522,6 +542,7 @@ public sealed partial class MainPage : Page
 
     private async void OnDrop(object sender, DragEventArgs e)
     {
+        if (_vm.IsCapturing) return;
         if (e.DataView.Contains(StandardDataFormats.StorageItems))
         {
             var items = await e.DataView.GetStorageItemsAsync();

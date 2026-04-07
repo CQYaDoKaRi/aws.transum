@@ -65,8 +65,8 @@ public class TranscribeClient
 ### SettingsDialog (ContentDialog)
 
 ```csharp
-// ContentDialogベースの設定画面（MinWidth=750）
-// グループラベル: 青色バッジ（🔑 AWS認証情報、📁 フォルダ設定、🎙️ リアルタイム設定、🔍 要約（Bedrock））
+// ContentDialogベースの設定画面（MinWidth=1100, FullSizeDesired=true, ContentDialogMaxWidth=1200, ContentDialogMaxHeight=1200）
+// グループラベル: 青色バッジ（🔑 AWS認証情報、📁 フォルダ設定）
 // - TextBox: Access Key ID
 // - PasswordBox: Secret Access Key
 // - ComboBox: リージョン（12リージョン）

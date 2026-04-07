@@ -31,6 +31,7 @@ public partial class MainViewModel : ObservableObject
 
     // Retry context
     private Func<Task>? _lastOperation;
+    private DateTime? _captureStartTime;
 
     [ObservableProperty] private AudioFile? _audioFile;
     [ObservableProperty] private Transcript? _transcript;
@@ -383,7 +384,8 @@ public partial class MainViewModel : ObservableObject
         {
             _audioCaptureService.StartCapture(SelectedSource);
             IsCapturing = true;
-            ProgressMessage = "音声をキャプチャ中...";
+            _captureStartTime = DateTime.Now;
+            ProgressMessage = "音声をキャプチャ中... 00:00";
             IsProgressIndeterminate = true;
             StatusProgress = 0;
 
@@ -491,6 +493,7 @@ public partial class MainViewModel : ObservableObject
 
             var filePath = _audioCaptureService.StopCapture();
             IsCapturing = false;
+            _captureStartTime = null;
             ProgressMessage = null;
             AudioLevel = 0;
 
@@ -522,6 +525,8 @@ public partial class MainViewModel : ObservableObject
 
         _audioCaptureService.CancelCapture();
         IsCapturing = false;
+        _captureStartTime = null;
+        ProgressMessage = null;
         AudioLevel = 0;
     }
 
@@ -643,6 +648,13 @@ public partial class MainViewModel : ObservableObject
             ? (double)_statusMonitor.AppMemoryBytes / _statusMonitor.TotalMemoryBytes * 100
             : 0;
         MemoryDisplay = $"{appMb:F0} MB / {totalGb:F1} GB ({pct:F0}%)";
+
+        // 録音中は録音時間を表示
+        if (IsCapturing && _captureStartTime.HasValue)
+        {
+            var elapsed = DateTime.Now - _captureStartTime.Value;
+            ProgressMessage = $"音声をキャプチャ中... {elapsed:mm\\:ss}";
+        }
     }
 
     private void UpdatePlayerPosition()

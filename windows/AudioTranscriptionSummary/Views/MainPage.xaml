@@ -14,7 +14,7 @@
             <AppBarButton x:Name="RecordButton" Icon="Microphone" Label="録音" Click="OnRecordClick" />
             <AppBarButton x:Name="StopRecordButton" Icon="Stop" Label="停止" Visibility="Collapsed" Click="OnStopRecordClick" />
             <AppBarButton x:Name="CancelButton" Icon="Cancel" Label="キャンセル" Visibility="Collapsed" Click="OnCancelClick" />
-            <AppBarButton Icon="Setting" Label="設定" Click="OnSettingsClick" />
+            <AppBarButton x:Name="SettingsButton" Icon="Setting" Label="設定" Click="OnSettingsClick" />
         </CommandBar>
 
         <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto">
@@ -32,8 +32,8 @@
                     </Expander.Header>
                     <StackPanel Spacing="8" Padding="8">
                         <StackPanel Orientation="Horizontal" Spacing="8">
-                            <ComboBox x:Name="AudioSourcePicker" Header="入力ソース" DisplayMemberPath="Name" />
-                            <ToggleSwitch x:Name="RealtimeToggle" Header="リアルタイム文字起こし" IsOn="True" Toggled="OnRealtimeToggled" VerticalAlignment="Bottom" />
+                            <ComboBox x:Name="AudioSourcePicker" DisplayMemberPath="Name" />
+                            <ToggleSwitch x:Name="RealtimeToggle" OnContent="リアルタイム文字起こし" OffContent="リアルタイム文字起こし" Toggled="OnRealtimeToggled" VerticalAlignment="Center" />
                         </StackPanel>
                         <TextBlock Text="音声レベル" FontSize="12" />
                         <ProgressBar x:Name="LevelMeter" Maximum="1" Value="0" Height="8" />
@@ -106,7 +106,7 @@
                             <StackPanel Orientation="Horizontal" Spacing="8">
                                 <FontIcon Glyph="&#xE898;" FontSize="20" />
                                 <TextBlock Text="ドラッグ＆ドロップで対応ファイルをアップロード" VerticalAlignment="Center" />
-                                <Button Click="OnFilePickClick"><StackPanel Orientation="Horizontal" Spacing="4"><FontIcon Glyph="&#xE8E5;" FontSize="14" /><TextBlock Text="ファイルを選択" /></StackPanel></Button>
+                                <Button x:Name="FilePickButton" Click="OnFilePickClick"><StackPanel Orientation="Horizontal" Spacing="4"><FontIcon Glyph="&#xE8E5;" FontSize="14" /><TextBlock Text="ファイルを選択" /></StackPanel></Button>
                             </StackPanel>
                         </Border>
                         <Grid x:Name="PlayerPanel" Padding="8,4" Visibility="Collapsed">
@@ -160,7 +160,7 @@
                     <StackPanel Margin="0,4">
                         <!-- 基盤モデル選択 + プロンプト + ボタン -->
                         <StackPanel Orientation="Horizontal" Spacing="4" Margin="4,0,4,4">
-                            <ComboBox x:Name="BedrockModelCombo" Width="200" />
+                            <ComboBox x:Name="BedrockModelCombo" MinWidth="350" />
                         </StackPanel>
                         <Grid Margin="4,0,4,4">
                             <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="140" /></Grid.ColumnDefinitions>

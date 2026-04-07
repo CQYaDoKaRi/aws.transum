@@ -273,6 +273,11 @@ public partial class MainViewModel : ObservableObject
 - Transcript設定/クリア時: TranscriptTranslationText をクリア
 - 要約開始時: Summary=null, SummaryTranslationVM.Reset()
 - 録音開始時: 全テキストクリア（RealtimeTranscriptionVM, 全TranslationVM, Transcript, Summary, AudioFile）
+- 録音キャンセル時: ProgressMessage=null, _captureStartTime=null でステータスバーをクリア
+
+録音中の状態管理:
+- 録音中は設定ボタン、ファイル選択ボタン、ドラッグ＆ドロップ、ファイルから要約ボタン、要約ボタンを無効化
+- ステータスバーに「音声をキャプチャ中... mm:ss」形式で録音経過時間を表示（2秒ごと更新）
 
 要約フロー:
 - 「要約」ボタン: Transcriptがあればそれを使用、なければリアルタイムテキストからTranscript生成、Bedrockで要約

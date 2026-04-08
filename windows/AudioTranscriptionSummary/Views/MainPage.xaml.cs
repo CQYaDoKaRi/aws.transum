@@ -675,10 +675,11 @@ public sealed partial class MainPage : Page
 
             store.Save(settings);
 
-            // Update realtime section visibility after settings change
+            // 設定変更を即反映
             RealtimeToggle.IsOn = settings.IsRealtimeEnabled;
             RealtimeSection.Visibility = settings.IsRealtimeEnabled
                 ? Visibility.Visible : Visibility.Collapsed;
+            InitializeBedrockModelCombo(settings);
         }
     }
 

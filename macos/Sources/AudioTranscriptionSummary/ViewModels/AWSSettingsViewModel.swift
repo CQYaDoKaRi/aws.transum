@@ -107,15 +107,47 @@ class AWSSettingsViewModel: ObservableObject {
         AppSettingsStore().load().bedrockModelId
     }
 
+    // MARK: - 自動保存用 Combine
+
+    private var cancellables = Set<AnyCancellable>()
+
     // MARK: - イニシャライザ
 
     init() {
         loadAll()
+        setupAutoSave()
     }
 
     /// 後方互換: credentialManager 引数は無視する
     init(credentialManager: any AWSCredentialManaging) {
         loadAll()
+        setupAutoSave()
+    }
+
+    /// 設定変更時に即座に保存する（Combine で監視）
+    private func setupAutoSave() {
+        // 認証情報・ディレクトリ・リージョン・S3・モデル等の変更を監視
+        Publishers.MergeMany(
+            $accessKeyId.map { _ in () }.eraseToAnyPublisher(),
+            $secretAccessKey.map { _ in () }.eraseToAnyPublisher(),
+            $region.map { _ in () }.eraseToAnyPublisher(),
+            $s3BucketName.map { _ in () }.eraseToAnyPublisher(),
+            $recordingDirectoryPath.map { _ in () }.eraseToAnyPublisher(),
+            $exportDirectoryPath.map { _ in () }.eraseToAnyPublisher(),
+            $isRealtimeEnabled.map { _ in () }.eraseToAnyPublisher(),
+            $bedrockModelId.map { _ in () }.eraseToAnyPublisher()
+        )
+        .dropFirst(8) // 初期値の発火をスキップ
+        .debounce(for: .milliseconds(500), scheduler: RunLoop.main)
+        .sink { [weak self] in
+            self?.saveToFile()
+            // isSaved を更新
+            if let self = self {
+                self.isSaved = !self.accessKeyId.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+                    && !self.secretAccessKey.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+            }
+        }
+        .store(in: &cancellables)
     }
 
     // MARK: - 読み込み

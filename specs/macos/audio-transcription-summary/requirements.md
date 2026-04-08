@@ -207,6 +207,7 @@
 2. THE App SHALL リアルタイム文字起こしの有効/無効（isRealtimeEnabled）を設定ファイルに保存する
 3. WHEN App が起動した場合、THE App SHALL 設定ファイルから分割間隔とリアルタイム設定を復元する
 4. THE App SHALL 設定変更時に即座に設定ファイルに保存する
+5. THE App SHALL 設定画面の全設定項目（認証情報・リージョン・S3・ディレクトリ・モデル）を変更時に即座に保存し、アプリに反映する
 
 ### 要件 17: 二重起動防止（Single Instance）
 

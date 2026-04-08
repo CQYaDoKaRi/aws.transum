@@ -101,7 +101,7 @@ class AWSSettingsViewModel: ObservableObject {
 
     // MARK: - 設定ファイルストア
 
-    nonisolated(unsafe) private static let settingsStore = AppSettingsStore()
+    private static let settingsStore = AppSettingsStore()
 
     // MARK: - 静的プロパティ
 

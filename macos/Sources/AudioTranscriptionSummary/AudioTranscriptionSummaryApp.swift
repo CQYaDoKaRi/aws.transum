@@ -128,7 +128,6 @@ struct AudioTranscriptionSummaryApp: App {
             .font: tFont,
             .foregroundColor: NSColor(white: 1.0, alpha: 0.85)
         ])
-        let tSize = tStr.size()
         let tPoint = NSPoint(x: size * 0.10, y: size * 0.08)
         tStr.draw(at: tPoint)
         ctx.restoreGState()

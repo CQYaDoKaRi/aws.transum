@@ -100,13 +100,13 @@ class AppViewModel: ObservableObject {
     // MARK: - システム音声キャプチャ
 
     /// システム音声キャプチャサービス
-    nonisolated(unsafe) private let systemAudioCapture = SystemAudioCapture()
+    private let systemAudioCapture = SystemAudioCapture()
 
     /// 画面録画サービス
-    nonisolated(unsafe) private let screenRecorder = ScreenRecorder()
+    private let screenRecorder = ScreenRecorder()
 
     /// 動画から音声を抽出するサービス
-    nonisolated(unsafe) private let audioExtractor = AudioExtractor()
+    private let audioExtractor = AudioExtractor()
 
     /// システム音声キャプチャ中かどうか
     @Published var isCapturingSystemAudio: Bool = false

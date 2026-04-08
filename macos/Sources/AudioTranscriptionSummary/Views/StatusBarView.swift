@@ -6,6 +6,7 @@ import Darwin
 
 struct StatusBarView: View {
     @ObservedObject var viewModel: AppViewModel
+    @ObservedObject var awsSettingsViewModel: AWSSettingsViewModel
     @State private var appCpuUsage: Double = 0
     @State private var systemCpuUsage: Double = 0
     @State private var appMemory: UInt64 = 0
@@ -20,8 +21,12 @@ struct StatusBarView: View {
 
     var body: some View {
         HStack(spacing: 16) {
-            // 左寄せ: プログレスバー＋メッセージ or 録音時間
-            if isAnyCapturing {
+            // 左寄せ: AWS接続ステータス or プログレスバー＋メッセージ or 録音時間
+            if !awsSettingsViewModel.isAWSConnected {
+                Circle().fill(.red).frame(width: 6, height: 6)
+                Text("AWS 未接続 — 設定画面から接続してください")
+                    .font(.caption2).foregroundStyle(.red)
+            } else if isAnyCapturing {
                 Circle().fill(.red).frame(width: 6, height: 6)
                 Text(String(format: "録音中 %02d:%02d", Int(recordingElapsed) / 60, Int(recordingElapsed) % 60))
                     .font(.caption2).monospacedDigit().foregroundStyle(.red)
@@ -35,6 +40,15 @@ struct StatusBarView: View {
                 }
                 Text(message)
                     .font(.caption2).foregroundStyle(.secondary)
+            } else if awsSettingsViewModel.isAWSConnected {
+                Circle().fill(.green).frame(width: 6, height: 6)
+                if let mins = awsSettingsViewModel.ssoRemainingMinutes {
+                    Text("AWS 接続済み（残り \(mins) 分）")
+                        .font(.caption2).foregroundStyle(.green)
+                } else {
+                    Text("AWS 接続済み")
+                        .font(.caption2).foregroundStyle(.green)
+                }
             }
 
             Spacer()

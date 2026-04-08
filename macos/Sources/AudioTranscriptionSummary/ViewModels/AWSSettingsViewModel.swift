@@ -25,6 +25,27 @@ class AWSSettingsViewModel: ObservableObject {
     @Published var connectionTestResult: String?
     @Published var connectionTestSuccess: Bool = false
 
+    /// AWS 接続済みかどうか（メイン画面の機能有効/無効判定用）
+    var isAWSConnected: Bool {
+        if connectionTestSuccess { return true }
+        // SSO 認証済みで一時認証情報が有効な場合も接続済みとみなす
+        if authMethod == .sso,
+           ssoAuthService.loginState == .authenticated,
+           let creds = SSOAuthService.cachedCredentials,
+           creds.expiration > Date() {
+            return true
+        }
+        return false
+    }
+
+    /// SSO 残り有効時間（分）。SSO以外またはcredsなしの場合はnil
+    var ssoRemainingMinutes: Int? {
+        guard authMethod == .sso,
+              let creds = SSOAuthService.cachedCredentials else { return nil }
+        let remaining = creds.expiration.timeIntervalSinceNow
+        return remaining > 0 ? Int(remaining / 60) : nil
+    }
+
     // MARK: - Published プロパティ（ディレクトリ設定）
 
     @Published var recordingDirectoryPath: String = ""
@@ -40,13 +61,43 @@ class AWSSettingsViewModel: ObservableObject {
     // MARK: - Published プロパティ（認証方式）
 
     /// 現在の認証方式
-    @Published var authMethod: AuthMethod = .accessKey
+    @Published var authMethod: AuthMethod = .sso
     /// 選択された AWS プロファイル名
     @Published var selectedProfileName: String = ""
     /// 利用可能なプロファイル一覧
     @Published var availableProfiles: [String] = []
     /// プロファイル読み込みエラー
     @Published var profileLoadError: String?
+
+    // MARK: - Published プロパティ（SSO 設定）
+
+    /// SSO Start URL
+    @Published var ssoStartUrl: String = ""
+    /// SSO リージョン
+    @Published var ssoRegion: String = ""
+    /// SSO で選択されたアカウント ID
+    @Published var ssoAccountId: String = ""
+    /// SSO で選択されたロール名
+    @Published var ssoRoleName: String = ""
+    /// SSO 認証サービス（共有インスタンス）
+    var ssoAuthService: SSOAuthService { SSOAuthService.shared }
+
+    // MARK: - Published プロパティ（S3 バケット選択）
+
+    /// 利用可能な S3 バケット一覧
+    @Published var availableBuckets: [String] = []
+    /// バケット検索フィルター
+    @Published var bucketSearchText: String = ""
+    /// バケット一覧読み込み中
+    @Published var isLoadingBuckets: Bool = false
+    /// バケット読み込みエラー
+    @Published var bucketLoadError: String?
+
+    /// 検索フィルター適用後のバケット一覧
+    var filteredBuckets: [String] {
+        if bucketSearchText.isEmpty { return availableBuckets }
+        return availableBuckets.filter { $0.localizedCaseInsensitiveContains(bucketSearchText) }
+    }
 
     // MARK: - 設定ファイルストア
 
@@ -90,7 +141,7 @@ class AWSSettingsViewModel: ObservableObject {
     /// authMethod に応じて Access Key またはプロファイルから認証情報を解決する
     nonisolated static func loadAWSCredentials() -> AWSCredentials? {
         let settings = AppSettingsStore().load()
-        let authMethod = AuthMethod(rawValue: settings.authMethod) ?? .accessKey
+        let authMethod = AuthMethod(rawValue: settings.authMethod) ?? .sso
 
         switch authMethod {
         case .accessKey:
@@ -117,6 +168,18 @@ class AWSSettingsViewModel: ObservableObject {
                 // AWS_PROFILE 環境変数は resolveCredentials 内で設定済み
                 return nil
             }
+
+        case .sso:
+            // SSO 方式: キャッシュされた一時認証情報を使用
+            guard let creds = SSOAuthService.cachedCredentials,
+                  creds.expiration > Date() else {
+                return nil
+            }
+            return AWSCredentials(
+                accessKeyId: creds.accessKeyId,
+                secretAccessKey: creds.secretAccessKey,
+                region: settings.region
+            )
         }
     }
 
@@ -128,13 +191,19 @@ class AWSSettingsViewModel: ObservableObject {
     /// AWS 認証情報が有効かどうか（authMethod に応じて判定）
     nonisolated static var hasValidCredentials: Bool {
         let settings = AppSettingsStore().load()
-        let authMethod = AuthMethod(rawValue: settings.authMethod) ?? .accessKey
+        let authMethod = AuthMethod(rawValue: settings.authMethod) ?? .sso
 
         switch authMethod {
         case .accessKey:
             return !settings.accessKeyId.isEmpty && !settings.secretAccessKey.isEmpty
         case .awsProfile:
             return !settings.awsProfileName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        case .sso:
+            // SSO 方式: キャッシュされた一時認証情報が有効かどうか
+            if let creds = SSOAuthService.cachedCredentials {
+                return creds.expiration > Date()
+            }
+            return false
         }
     }
 
@@ -189,12 +258,11 @@ class AWSSettingsViewModel: ObservableObject {
         }
         .store(in: &cancellables)
 
-        // authMethod 変更時の処理
+        // authMethod 変更時の処理（保存は保存ボタンで行う）
         $authMethod
             .dropFirst() // 初期値の発火をスキップ
             .sink { [weak self] newMethod in
                 guard let self = self else { return }
-                self.saveToFile()
                 self.updateSavedState()
                 // awsProfile に切り替わった時にプロファイル一覧を自動読み込み
                 if newMethod == .awsProfile {
@@ -212,6 +280,21 @@ class AWSSettingsViewModel: ObservableObject {
                 self.updateSavedState()
             }
             .store(in: &cancellables)
+
+        // SSO 関連フィールド変更時の処理
+        Publishers.MergeMany(
+            $ssoStartUrl.map { _ in () }.eraseToAnyPublisher(),
+            $ssoRegion.map { _ in () }.eraseToAnyPublisher(),
+            $ssoAccountId.map { _ in () }.eraseToAnyPublisher(),
+            $ssoRoleName.map { _ in () }.eraseToAnyPublisher()
+        )
+        .dropFirst(4) // 初期値の発火をスキップ
+        .debounce(for: .milliseconds(500), scheduler: RunLoop.main)
+        .sink { [weak self] in
+            self?.saveToFile()
+            self?.updateSavedState()
+        }
+        .store(in: &cancellables)
     }
 
     /// isSaved 状態を更新する
@@ -222,12 +305,16 @@ class AWSSettingsViewModel: ObservableObject {
                 && !secretAccessKey.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
         case .awsProfile:
             isSaved = !selectedProfileName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        case .sso:
+            // SSO 方式: Start URL が非空かつ認証済みの場合に保存済みとみなす
+            isSaved = !ssoStartUrl.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+                && ssoAuthService.loginState == .authenticated
         }
     }
 
     // MARK: - 読み込み
 
-    private func loadAll() {
+    func loadAll() {
         let settings = Self.settingsStore.load()
         accessKeyId = settings.accessKeyId
         secretAccessKey = settings.secretAccessKey
@@ -241,8 +328,14 @@ class AWSSettingsViewModel: ObservableObject {
         bedrockModelId = settings.bedrockModelId
 
         // 認証方式の復元
-        authMethod = AuthMethod(rawValue: settings.authMethod) ?? .accessKey
+        authMethod = AuthMethod(rawValue: settings.authMethod) ?? .sso
         selectedProfileName = settings.awsProfileName
+
+        // SSO 設定の復元
+        ssoStartUrl = settings.ssoStartUrl
+        ssoRegion = settings.ssoRegion
+        ssoAccountId = settings.ssoAccountId
+        ssoRoleName = settings.ssoRoleName
 
         // isSaved の初期状態を authMethod に応じて設定
         switch authMethod {
@@ -250,6 +343,14 @@ class AWSSettingsViewModel: ObservableObject {
             isSaved = !settings.accessKeyId.isEmpty && !settings.secretAccessKey.isEmpty
         case .awsProfile:
             isSaved = !settings.awsProfileName.isEmpty
+        case .sso:
+            // SSO 方式: キャッシュから復元を試みる
+            ssoAuthService.restoreFromCache()
+            if ssoAuthService.loginState == .authenticated {
+                isSaved = true
+            } else {
+                isSaved = false
+            }
         }
 
         // awsProfile の場合はプロファイル一覧を読み込み
@@ -287,6 +388,10 @@ class AWSSettingsViewModel: ObservableObject {
         )
         settings.authMethod = authMethod.rawValue
         settings.awsProfileName = selectedProfileName
+        settings.ssoStartUrl = ssoStartUrl
+        settings.ssoRegion = ssoRegion
+        settings.ssoAccountId = ssoAccountId
+        settings.ssoRoleName = ssoRoleName
         do {
             try Self.settingsStore.save(settings)
         } catch {
@@ -299,21 +404,40 @@ class AWSSettingsViewModel: ObservableObject {
     func saveCredentials() {
         errorMessage = nil
 
-        guard !accessKeyId.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
-            errorMessage = "Access Key ID を入力してください"; return
-        }
-        guard !secretAccessKey.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
-            errorMessage = "Secret Access Key を入力してください"; return
-        }
-        guard !region.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
-            errorMessage = "リージョンを入力してください"; return
-        }
-        guard !s3BucketName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
-            errorMessage = "S3 バケット名を入力してください"; return
+        // 常に設定を保存する（接続テスト失敗でも保存は維持）
+        saveToFile()
+
+        // 認証方式ごとの必須項目チェック
+        var hasValidationError = false
+        switch authMethod {
+        case .accessKey:
+            if accessKeyId.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                errorMessage = "Access Key ID を入力してください"; hasValidationError = true
+            } else if secretAccessKey.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                errorMessage = "Secret Access Key を入力してください"; hasValidationError = true
+            }
+        case .awsProfile:
+            if selectedProfileName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                errorMessage = "プロファイルを選択してください"; hasValidationError = true
+            }
+        case .sso:
+            if ssoStartUrl.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                errorMessage = "Start URL を入力してください"; hasValidationError = true
+            } else if ssoRegion.isEmpty {
+                errorMessage = "SSO リージョンを選択してください"; hasValidationError = true
+            }
         }
 
-        saveToFile()
+        if s3BucketName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            errorMessage = "S3 バケット名を入力してください"; hasValidationError = true
+        }
+
         isSaved = true
+
+        // バリデーションエラーがなければ接続テストを実行
+        if !hasValidationError {
+            Task { await testConnection() }
+        }
     }
 
     func deleteCredentials() {
@@ -407,6 +531,31 @@ class AWSSettingsViewModel: ObservableObject {
         loadProfiles()
     }
 
+    /// SSO 認証完了後に isSaved 状態を更新する（View から呼び出し用）
+    func updateSSOSavedState() {
+        updateSavedState()
+        saveToFile()
+    }
+
+    // MARK: - S3 バケット一覧取得
+
+    /// 選択中のリージョンの S3 バケット一覧を取得する
+    func fetchBuckets() async {
+        isLoadingBuckets = true
+        bucketLoadError = nil
+        availableBuckets = []
+
+        do {
+            let s3 = try AWSS3Service(region: region)
+            let buckets = try await s3.listBuckets()
+            availableBuckets = buckets.sorted()
+        } catch {
+            bucketLoadError = "バケット一覧の取得に失敗しました"
+            availableBuckets = []
+        }
+        isLoadingBuckets = false
+    }
+
     // MARK: - AWS 接続テスト
 
     func testConnection() async {
@@ -425,6 +574,8 @@ class AWSSettingsViewModel: ObservableObject {
             await testConnectionWithAccessKey(bucket: bucket)
         case .awsProfile:
             await testConnectionWithProfile(bucket: bucket)
+        case .sso:
+            await testConnectionWithSSO(bucket: bucket)
         }
     }
 
@@ -461,6 +612,30 @@ class AWSSettingsViewModel: ObservableObject {
             let d = error.localizedDescription.lowercased()
             if d.contains("expired") || d.contains("invalid") || d.contains("credential") {
                 connectionTestResult = "接続失敗: 認証情報が無効です。`aws sso login --profile \(selectedProfileName)` を実行してください。"
+                connectionTestSuccess = false
+            } else {
+                handleConnectionTestError(error, bucket: bucket)
+            }
+        }
+    }
+
+    /// SSO 方式の接続テスト
+    private func testConnectionWithSSO(bucket: String) async {
+        // SSO 認証が完了しているか確認
+        guard ssoAuthService.loginState == .authenticated,
+              SSOAuthService.cachedCredentials != nil else {
+            connectionTestResult = "SSO ログインを実行してください。"
+            connectionTestSuccess = false
+            return
+        }
+
+        do {
+            let s3 = try AWSS3Service()
+            try await performS3ConnectionTest(s3: s3, bucket: bucket)
+        } catch {
+            let d = error.localizedDescription.lowercased()
+            if d.contains("expired") || d.contains("token") {
+                connectionTestResult = "接続失敗: 認証情報が期限切れです。設定画面から SSO ログインを再実行してください。"
                 connectionTestSuccess = false
             } else {
                 handleConnectionTestError(error, bucket: bucket)

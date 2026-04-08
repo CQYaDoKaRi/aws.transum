@@ -32,10 +32,18 @@ struct AppSettings: Codable, Equatable {
     var summaryAdditionalPrompt: String = ""
     /// ファイル分割間隔（分）。1〜60、デフォルト30
     var splitIntervalMinutes: Int = 30
-    /// 認証方式（"accessKey" または "awsProfile"）
+    /// 認証方式（"accessKey" / "awsProfile" / "sso"）
     var authMethod: String = "accessKey"
     /// 選択された AWS プロファイル名
     var awsProfileName: String = ""
+    /// SSO Start URL（IAM Identity Center のスタート URL）
+    var ssoStartUrl: String = ""
+    /// SSO リージョン（Identity Center のリージョン）
+    var ssoRegion: String = ""
+    /// SSO で選択されたアカウント ID
+    var ssoAccountId: String = ""
+    /// SSO で選択されたロール名
+    var ssoRoleName: String = ""
 }
 
 // MARK: - AppSettingsStore（設定ファイル管理）

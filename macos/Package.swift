@@ -30,7 +30,9 @@ let package = Package(
                 .product(name: "AWSTranscribeStreaming", package: "aws-sdk-swift"),
                 .product(name: "AWSTranslate", package: "aws-sdk-swift"),
                 .product(name: "AWSBedrockRuntime", package: "aws-sdk-swift"),
-                .product(name: "AWSS3", package: "aws-sdk-swift")
+                .product(name: "AWSS3", package: "aws-sdk-swift"),
+                .product(name: "AWSSSOOIDC", package: "aws-sdk-swift"),
+                .product(name: "AWSSSO", package: "aws-sdk-swift")
             ],
             path: "Sources/AudioTranscriptionSummary"
         ),

@@ -307,13 +307,29 @@ public sealed partial class MainPage : Page
         {
             var store = new SettingsStore();
             var settings = store.Load();
-            if (string.IsNullOrWhiteSpace(settings.AccessKeyId))
+            // SSO 方式の場合はキャッシュから復元を試みる
+            if (settings.AuthMethod == "sso")
+            {
+                var ssoService = SSOAuthService.Instance;
+                ssoService.RestoreFromCache();
+                if (ssoService.LoginState == SSOLoginState.Authenticated)
+                {
+                    // キャッシュから復元成功 → 接続テスト
+                    var client = new TranscribeClient(store);
+                    await client.TestConnectionAsync();
+                    return;
+                }
+                // 復元失敗 → 設定画面を開く
+                OnSettingsClick(this, new RoutedEventArgs());
+                return;
+            }
+            if (string.IsNullOrWhiteSpace(settings.AccessKeyId) && settings.AuthMethod != "awsProfile")
             {
                 OnSettingsClick(this, new RoutedEventArgs());
                 return;
             }
-            var client = new TranscribeClient(store);
-            await client.TestConnectionAsync();
+            var testClient = new TranscribeClient(store);
+            await testClient.TestConnectionAsync();
         }
         catch
         {
@@ -532,7 +548,12 @@ public sealed partial class MainPage : Page
         var settings = store.Load();
 
         // 認証方式の状態管理
-        var currentAuthMethod = settings.AuthMethod == "awsProfile" ? "awsProfile" : "accessKey";
+        var currentAuthMethod = settings.AuthMethod switch
+        {
+            "awsProfile" => "awsProfile",
+            "sso" => "sso",
+            _ => "accessKey"
+        };
 
         // --- 認証方式 RadioButtons ---
         var authMethodRadio = new RadioButtons
@@ -542,10 +563,14 @@ public sealed partial class MainPage : Page
         };
         var accessKeyRadioItem = new RadioButton { Content = "Access Key", Tag = "accessKey" };
         var awsProfileRadioItem = new RadioButton { Content = "AWS Profile", Tag = "awsProfile" };
+        var ssoRadioItem = new RadioButton { Content = "IAM Identity Center（SSO）", Tag = "sso" };
         authMethodRadio.Items.Add(accessKeyRadioItem);
         authMethodRadio.Items.Add(awsProfileRadioItem);
+        authMethodRadio.Items.Add(ssoRadioItem);
         if (currentAuthMethod == "awsProfile")
             awsProfileRadioItem.IsChecked = true;
+        else if (currentAuthMethod == "sso")
+            ssoRadioItem.IsChecked = true;
         else
             accessKeyRadioItem.IsChecked = true;
 
@@ -579,6 +604,257 @@ public sealed partial class MainPage : Page
         var awsProfilePanel = new StackPanel { Margin = new Thickness(0, 0, 0, 0) };
         awsProfilePanel.Children.Add(profileGrid);
         awsProfilePanel.Children.Add(profileErrorText);
+
+        // --- SSO フィールド ---
+        var ssoStartUrlBox = new TextBox
+        {
+            Header = "Start URL",
+            Text = settings.SsoStartUrl,
+            PlaceholderText = "https://my-org.awsapps.com/start",
+            Margin = new Thickness(0, 0, 0, 8)
+        };
+
+        var ssoRegionCombo = new ComboBox
+        {
+            Header = "SSO リージョン",
+            HorizontalAlignment = HorizontalAlignment.Stretch,
+            Margin = new Thickness(0, 0, 0, 8)
+        };
+        var ssoRegions = new[] { "us-east-1", "us-east-2", "us-west-1", "us-west-2",
+            "ap-northeast-1", "ap-northeast-2", "ap-southeast-1", "ap-southeast-2",
+            "eu-west-1", "eu-west-2", "eu-central-1", "ca-central-1" };
+        foreach (var r in ssoRegions) ssoRegionCombo.Items.Add(r);
+        ssoRegionCombo.SelectedItem = string.IsNullOrEmpty(settings.SsoRegion) ? "us-east-1" : settings.SsoRegion;
+
+        var ssoLoginBtn = new Button
+        {
+            Content = "SSO ログイン",
+            Margin = new Thickness(0, 0, 0, 8)
+        };
+        var ssoLoginProgress = new ProgressRing
+        {
+            IsActive = false,
+            Width = 20,
+            Height = 20,
+            Margin = new Thickness(8, 0, 0, 0),
+            VerticalAlignment = VerticalAlignment.Center
+        };
+        var ssoLoginPanel = new StackPanel
+        {
+            Orientation = Orientation.Horizontal,
+            Margin = new Thickness(0, 0, 0, 4)
+        };
+        ssoLoginPanel.Children.Add(ssoLoginBtn);
+        ssoLoginPanel.Children.Add(ssoLoginProgress);
+
+        // User Code 表示
+        var ssoUserCodeText = new TextBlock
+        {
+            Text = "",
+            FontSize = 18,
+            FontWeight = Microsoft.UI.Text.FontWeights.Bold,
+            IsTextSelectionEnabled = true,
+            Margin = new Thickness(0, 0, 0, 2),
+            Visibility = Visibility.Collapsed
+        };
+        var ssoGuidanceText = new TextBlock
+        {
+            Text = "ブラウザで上記コードを入力してください",
+            FontSize = 12,
+            Foreground = new Microsoft.UI.Xaml.Media.SolidColorBrush(Microsoft.UI.Colors.Gray),
+            Margin = new Thickness(0, 0, 0, 8),
+            Visibility = Visibility.Collapsed
+        };
+
+        // アカウント ComboBox
+        var ssoAccountCombo = new ComboBox
+        {
+            Header = "アカウント",
+            HorizontalAlignment = HorizontalAlignment.Stretch,
+            Margin = new Thickness(0, 0, 0, 8),
+            Visibility = Visibility.Collapsed
+        };
+
+        // ロール ComboBox
+        var ssoRoleCombo = new ComboBox
+        {
+            Header = "ロール",
+            HorizontalAlignment = HorizontalAlignment.Stretch,
+            Margin = new Thickness(0, 0, 0, 8),
+            Visibility = Visibility.Collapsed
+        };
+
+        // 認証ステータス表示
+        var ssoStatusText = new TextBlock
+        {
+            Text = "",
+            FontSize = 12,
+            TextWrapping = TextWrapping.Wrap,
+            Margin = new Thickness(0, 0, 0, 8),
+            Visibility = Visibility.Collapsed
+        };
+
+        // SSO エラーテキスト
+        var ssoErrorText = new TextBlock
+        {
+            Foreground = new Microsoft.UI.Xaml.Media.SolidColorBrush(Microsoft.UI.Colors.Red),
+            FontSize = 12,
+            TextWrapping = TextWrapping.Wrap,
+            Margin = new Thickness(0, 0, 0, 8),
+            Visibility = Visibility.Collapsed
+        };
+
+        // SSO ログインボタンのクリックイベント
+        ssoLoginBtn.Click += async (_, _) =>
+        {
+            var startUrl = ssoStartUrlBox.Text?.Trim() ?? "";
+            var ssoReg = ssoRegionCombo.SelectedItem?.ToString() ?? "us-east-1";
+
+            if (string.IsNullOrEmpty(startUrl))
+            {
+                ssoErrorText.Text = "有効な Start URL を入力してください";
+                ssoErrorText.Visibility = Visibility.Visible;
+                return;
+            }
+
+            ssoErrorText.Visibility = Visibility.Collapsed;
+            ssoLoginBtn.IsEnabled = false;
+            ssoLoginProgress.IsActive = true;
+            ssoAccountCombo.Visibility = Visibility.Collapsed;
+            ssoRoleCombo.Visibility = Visibility.Collapsed;
+            ssoStatusText.Visibility = Visibility.Collapsed;
+
+            var ssoService = SSOAuthService.Instance;
+            ssoService.Reset();
+
+            // 状態変更を監視
+            void OnSsoPropertyChanged(object? s, System.ComponentModel.PropertyChangedEventArgs args)
+            {
+                if (args.PropertyName == nameof(SSOAuthService.UserCode) && ssoService.UserCode != null)
+                {
+                    DispatcherQueue.TryEnqueue(() =>
+                    {
+                        ssoUserCodeText.Text = ssoService.UserCode;
+                        ssoUserCodeText.Visibility = Visibility.Visible;
+                        ssoGuidanceText.Visibility = Visibility.Visible;
+                    });
+                }
+            }
+            ssoService.PropertyChanged += OnSsoPropertyChanged;
+
+            try
+            {
+                await ssoService.StartLoginAsync(startUrl, ssoReg);
+
+                if (ssoService.LoginState == SSOLoginState.SelectingAccount)
+                {
+                    // 認証成功 → アカウント一覧を取得
+                    await ssoService.FetchAccountsAsync();
+
+                    if (ssoService.Accounts.Count > 0)
+                    {
+                        ssoAccountCombo.Items.Clear();
+                        foreach (var account in ssoService.Accounts)
+                            ssoAccountCombo.Items.Add(account.DisplayName);
+                        ssoAccountCombo.Visibility = Visibility.Visible;
+
+                        // 保存済みアカウントを選択
+                        var savedAccountId = settings.SsoAccountId;
+                        var savedIdx = ssoService.Accounts.FindIndex(a => a.AccountId == savedAccountId);
+                        ssoAccountCombo.SelectedIndex = savedIdx >= 0 ? savedIdx : 0;
+
+                        ssoStatusText.Text = "✅ 認証済み - アカウントを選択してください";
+                        ssoStatusText.Foreground = new Microsoft.UI.Xaml.Media.SolidColorBrush(Microsoft.UI.Colors.Green);
+                        ssoStatusText.Visibility = Visibility.Visible;
+                    }
+                }
+                else if (ssoService.LoginState == SSOLoginState.Error)
+                {
+                    ssoErrorText.Text = ssoService.ErrorMessage ?? "SSO ログインに失敗しました";
+                    ssoErrorText.Visibility = Visibility.Visible;
+                }
+            }
+            catch (Exception ex)
+            {
+                ssoErrorText.Text = $"SSO ログインに失敗しました: {ex.Message}";
+                ssoErrorText.Visibility = Visibility.Visible;
+            }
+            finally
+            {
+                ssoService.PropertyChanged -= OnSsoPropertyChanged;
+                ssoLoginBtn.IsEnabled = true;
+                ssoLoginProgress.IsActive = false;
+            }
+        };
+
+        // アカウント選択時にロール一覧を取得
+        ssoAccountCombo.SelectionChanged += async (_, _) =>
+        {
+            if (ssoAccountCombo.SelectedIndex < 0) return;
+            var ssoService = SSOAuthService.Instance;
+            if (ssoAccountCombo.SelectedIndex >= ssoService.Accounts.Count) return;
+
+            var selectedAccount = ssoService.Accounts[ssoAccountCombo.SelectedIndex];
+            ssoRoleCombo.Visibility = Visibility.Collapsed;
+
+            await ssoService.FetchRolesAsync(selectedAccount.AccountId);
+
+            if (ssoService.Roles.Count > 0)
+            {
+                ssoRoleCombo.Items.Clear();
+                foreach (var role in ssoService.Roles)
+                    ssoRoleCombo.Items.Add(role);
+                ssoRoleCombo.Visibility = Visibility.Visible;
+
+                // 保存済みロールを選択
+                var savedRole = settings.SsoRoleName;
+                var savedRoleIdx = ssoService.Roles.IndexOf(savedRole);
+                ssoRoleCombo.SelectedIndex = savedRoleIdx >= 0 ? savedRoleIdx : 0;
+            }
+            else if (ssoService.LoginState == SSOLoginState.Error)
+            {
+                ssoErrorText.Text = ssoService.ErrorMessage ?? "ロール一覧の取得に失敗しました";
+                ssoErrorText.Visibility = Visibility.Visible;
+            }
+        };
+
+        // ロール選択時に一時認証情報を取得
+        ssoRoleCombo.SelectionChanged += async (_, _) =>
+        {
+            if (ssoRoleCombo.SelectedIndex < 0 || ssoAccountCombo.SelectedIndex < 0) return;
+            var ssoService = SSOAuthService.Instance;
+            if (ssoAccountCombo.SelectedIndex >= ssoService.Accounts.Count) return;
+            if (ssoRoleCombo.SelectedIndex >= ssoService.Roles.Count) return;
+
+            var selectedAccount = ssoService.Accounts[ssoAccountCombo.SelectedIndex];
+            var selectedRole = ssoService.Roles[ssoRoleCombo.SelectedIndex];
+
+            await ssoService.FetchCredentialsAsync(selectedAccount.AccountId, selectedRole);
+
+            if (ssoService.LoginState == SSOLoginState.Authenticated)
+            {
+                ssoStatusText.Text = "✅ 認証済み";
+                ssoStatusText.Foreground = new Microsoft.UI.Xaml.Media.SolidColorBrush(Microsoft.UI.Colors.Green);
+                ssoStatusText.Visibility = Visibility.Visible;
+                ssoErrorText.Visibility = Visibility.Collapsed;
+            }
+            else if (ssoService.LoginState == SSOLoginState.Error)
+            {
+                ssoErrorText.Text = ssoService.ErrorMessage ?? "一時認証情報の取得に失敗しました";
+                ssoErrorText.Visibility = Visibility.Visible;
+            }
+        };
+
+        var ssoPanel = new StackPanel { Margin = new Thickness(0, 0, 0, 0) };
+        ssoPanel.Children.Add(ssoStartUrlBox);
+        ssoPanel.Children.Add(ssoRegionCombo);
+        ssoPanel.Children.Add(ssoLoginPanel);
+        ssoPanel.Children.Add(ssoUserCodeText);
+        ssoPanel.Children.Add(ssoGuidanceText);
+        ssoPanel.Children.Add(ssoErrorText);
+        ssoPanel.Children.Add(ssoAccountCombo);
+        ssoPanel.Children.Add(ssoRoleCombo);
+        ssoPanel.Children.Add(ssoStatusText);
 
         // プロファイル一覧を読み込むヘルパー
         void LoadProfiles()
@@ -615,16 +891,21 @@ public sealed partial class MainPage : Page
         void UpdateAuthMethodVisibility()
         {
             var isAccessKey = accessKeyRadioItem.IsChecked == true;
-            accessKeyPanel.Visibility = isAccessKey ? Visibility.Visible : Visibility.Collapsed;
-            awsProfilePanel.Visibility = isAccessKey ? Visibility.Collapsed : Visibility.Visible;
+            var isAwsProfile = awsProfileRadioItem.IsChecked == true;
+            var isSso = ssoRadioItem.IsChecked == true;
 
-            if (!isAccessKey)
+            accessKeyPanel.Visibility = isAccessKey ? Visibility.Visible : Visibility.Collapsed;
+            awsProfilePanel.Visibility = isAwsProfile ? Visibility.Visible : Visibility.Collapsed;
+            ssoPanel.Visibility = isSso ? Visibility.Visible : Visibility.Collapsed;
+
+            if (isAwsProfile)
                 LoadProfiles();
         }
 
         // RadioButton 変更イベント
         accessKeyRadioItem.Checked += (_, _) => UpdateAuthMethodVisibility();
         awsProfileRadioItem.Checked += (_, _) => UpdateAuthMethodVisibility();
+        ssoRadioItem.Checked += (_, _) => UpdateAuthMethodVisibility();
 
         // リフレッシュボタン
         profileRefreshBtn.Click += (_, _) => LoadProfiles();
@@ -716,14 +997,43 @@ public sealed partial class MainPage : Page
             {
                 // 認証方式に応じてテスト用設定を構築
                 var isAccessKeyMode = accessKeyRadioItem.IsChecked == true;
+                var isSsoMode = ssoRadioItem.IsChecked == true;
+
+                string testAuthMethod;
+                if (isSsoMode)
+                    testAuthMethod = "sso";
+                else if (isAccessKeyMode)
+                    testAuthMethod = "accessKey";
+                else
+                    testAuthMethod = "awsProfile";
+
+                // SSO 方式の場合、認証済みかチェック
+                if (isSsoMode)
+                {
+                    var ssoService = SSOAuthService.Instance;
+                    if (ssoService.TemporaryCredentials == null)
+                    {
+                        connectionStatusText.Text = "SSO ログインを実行してください";
+                        connectionStatusBadge.Background = new Microsoft.UI.Xaml.Media.SolidColorBrush(Microsoft.UI.Colors.Orange);
+                        testConnectionBtn.IsEnabled = true;
+                        testProgressRing.IsActive = false;
+                        return;
+                    }
+                }
+
                 var testSettings = new AppSettings
                 {
-                    AuthMethod = isAccessKeyMode ? "accessKey" : "awsProfile",
+                    AuthMethod = testAuthMethod,
                     AccessKeyId = accessKeyBox.Text,
                     SecretAccessKey = secretKeyBox.Password,
                     AwsProfileName = profileCombo.SelectedItem?.ToString() ?? "",
                     Region = regionCombo.SelectedItem?.ToString() ?? "ap-northeast-1",
-                    S3BucketName = s3Bucket.Text
+                    S3BucketName = s3Bucket.Text,
+                    SsoStartUrl = ssoStartUrlBox.Text,
+                    SsoRegion = ssoRegionCombo.SelectedItem?.ToString() ?? "",
+                    SsoAccountId = ssoAccountCombo.SelectedIndex >= 0 && SSOAuthService.Instance.Accounts.Count > ssoAccountCombo.SelectedIndex
+                        ? SSOAuthService.Instance.Accounts[ssoAccountCombo.SelectedIndex].AccountId : "",
+                    SsoRoleName = ssoRoleCombo.SelectedItem?.ToString() ?? ""
                 };
                 var tempStore = new SettingsStore();
                 var originalSettings = tempStore.Load();
@@ -765,6 +1075,7 @@ public sealed partial class MainPage : Page
         panel.Children.Add(authMethodRadio);
         panel.Children.Add(accessKeyPanel);
         panel.Children.Add(awsProfilePanel);
+        panel.Children.Add(ssoPanel);
         panel.Children.Add(regionCombo);
         panel.Children.Add(s3Bucket);
         panel.Children.Add(connectionPanel);
@@ -791,7 +1102,13 @@ public sealed partial class MainPage : Page
         if (result == ContentDialogResult.Primary)
         {
             // 認証方式と関連設定を保存
-            settings.AuthMethod = accessKeyRadioItem.IsChecked == true ? "accessKey" : "awsProfile";
+            if (ssoRadioItem.IsChecked == true)
+                settings.AuthMethod = "sso";
+            else if (awsProfileRadioItem.IsChecked == true)
+                settings.AuthMethod = "awsProfile";
+            else
+                settings.AuthMethod = "accessKey";
+
             settings.AwsProfileName = profileCombo.SelectedItem?.ToString() ?? "";
             settings.AccessKeyId = accessKeyBox.Text;
             settings.SecretAccessKey = secretKeyBox.Password;
@@ -799,6 +1116,16 @@ public sealed partial class MainPage : Page
             settings.S3BucketName = s3Bucket.Text;
             settings.RecordingDirectoryPath = recordDirBox.Text;
             settings.ExportDirectoryPath = exportDirBox.Text;
+
+            // SSO 設定を永続化
+            settings.SsoStartUrl = ssoStartUrlBox.Text?.Trim() ?? "";
+            settings.SsoRegion = ssoRegionCombo.SelectedItem?.ToString() ?? "";
+            if (ssoAccountCombo.SelectedIndex >= 0 &&
+                SSOAuthService.Instance.Accounts.Count > ssoAccountCombo.SelectedIndex)
+            {
+                settings.SsoAccountId = SSOAuthService.Instance.Accounts[ssoAccountCombo.SelectedIndex].AccountId;
+            }
+            settings.SsoRoleName = ssoRoleCombo.SelectedItem?.ToString() ?? "";
 
             store.Save(settings);
 

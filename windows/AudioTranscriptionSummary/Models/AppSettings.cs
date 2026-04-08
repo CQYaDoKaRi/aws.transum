@@ -47,4 +47,20 @@ public class AppSettings
     /// <summary>選択された AWS プロファイル名</summary>
     [JsonPropertyName("awsProfileName")]
     public string AwsProfileName { get; set; } = "";
+
+    /// <summary>SSO Start URL（IAM Identity Center のスタート URL）</summary>
+    [JsonPropertyName("ssoStartUrl")]
+    public string SsoStartUrl { get; set; } = "";
+
+    /// <summary>SSO リージョン（Identity Center のリージョン）</summary>
+    [JsonPropertyName("ssoRegion")]
+    public string SsoRegion { get; set; } = "";
+
+    /// <summary>SSO で選択されたアカウント ID</summary>
+    [JsonPropertyName("ssoAccountId")]
+    public string SsoAccountId { get; set; } = "";
+
+    /// <summary>SSO で選択されたロール名</summary>
+    [JsonPropertyName("ssoRoleName")]
+    public string SsoRoleName { get; set; } = "";
 }

@@ -20,6 +20,8 @@
     <PackageReference Include="AWSSDK.Translate" Version="4.*" />
     <PackageReference Include="AWSSDK.S3" Version="4.*" />
     <PackageReference Include="AWSSDK.BedrockRuntime" Version="4.*" />
+    <PackageReference Include="AWSSDK.SSOOIDC" Version="4.*" />
+    <PackageReference Include="AWSSDK.SSO" Version="4.*" />
     <PackageReference Include="NAudio" Version="2.*" />
     <PackageReference Include="System.Drawing.Common" Version="8.*" />
   </ItemGroup>

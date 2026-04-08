@@ -64,6 +64,22 @@ public static class AWSClientFactory
                 throw new AppError(AppErrorType.CredentialsNotSet,
                     $"プロファイル '{profileName}' の認証情報を解決できません。aws sso login --profile {profileName} を実行してください");
 
+            case Models.AuthMethod.Sso:
+                // IAM Identity Center（SSO）方式: SSOAuthService の一時認証情報を使用
+                var ssoCreds = SSOAuthService.Instance.TemporaryCredentials;
+                if (ssoCreds == null)
+                {
+                    throw new AppError(AppErrorType.CredentialsNotSet,
+                        "SSO ログインを実行してください");
+                }
+                if (ssoCreds.Expiration < DateTime.UtcNow)
+                {
+                    throw new AppError(AppErrorType.CredentialsNotSet,
+                        "認証情報が期限切れです。設定画面から SSO ログインを再実行してください");
+                }
+                return new SessionAWSCredentials(
+                    ssoCreds.AccessKeyId, ssoCreds.SecretAccessKey, ssoCreds.SessionToken);
+
             default:
                 throw new AppError(AppErrorType.CredentialsNotSet,
                     "不明な認証方式です");
@@ -120,6 +136,7 @@ public static class AWSClientFactory
         return authMethodStr?.ToLowerInvariant() switch
         {
             "awsprofile" => Models.AuthMethod.AwsProfile,
+            "sso" => Models.AuthMethod.Sso,
             _ => Models.AuthMethod.AccessKey
         };
     }

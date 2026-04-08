@@ -8,9 +8,11 @@ import Foundation
 /// AWS 認証方式を表す列挙型
 /// - `accessKey`: Access Key ID / Secret Access Key による手動入力方式
 /// - `awsProfile`: AWS CLI プロファイル選択方式（SSO / AssumeRole 対応）
+/// - `sso`: IAM Identity Center（SSO）方式
 enum AuthMethod: String, Codable, CaseIterable, Identifiable {
-    case accessKey = "accessKey"
+    case sso = "sso"
     case awsProfile = "awsProfile"
+    case accessKey = "accessKey"
 
     /// Identifiable 準拠用の ID
     var id: String { rawValue }
@@ -22,6 +24,8 @@ enum AuthMethod: String, Codable, CaseIterable, Identifiable {
             return "Access Key"
         case .awsProfile:
             return "AWS Profile"
+        case .sso:
+            return "IAM Identity Center"
         }
     }
 }

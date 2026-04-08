@@ -45,6 +45,11 @@ class AppViewModel: ObservableObject {
     /// エラーメッセージ（nil の場合はエラーなし）
     @Published var errorMessage: String?
 
+    /// AWS 接続可能かどうか（認証情報が有効な場合 true）
+    @Published var isAWSAvailable: Bool = false
+    /// AWS 接続エラーメッセージ（ステータスバー表示用）
+    @Published var awsConnectionError: String?
+
     // MARK: - ファイル分割設定
 
     /// ファイル分割間隔（分）。1〜60、デフォルト30分

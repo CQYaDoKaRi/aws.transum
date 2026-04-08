@@ -34,15 +34,19 @@ struct MainView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            inputArea
+            inputArea.disabled(!awsSettingsViewModel.isAWSConnected)
             Divider()
-            outputArea.layoutPriority(1)
+            outputArea.layoutPriority(1).disabled(!awsSettingsViewModel.isAWSConnected)
             Divider()
-            StatusBarView(viewModel: viewModel)
+            StatusBarView(viewModel: viewModel, awsSettingsViewModel: awsSettingsViewModel)
         }
         .frame(minWidth: 900, minHeight: 700)
         .toolbar { toolbarContent }
-        .sheet(isPresented: $showSettings) { AWSSettingsView(viewModel: awsSettingsViewModel) }
+        .sheet(isPresented: $showSettings, onDismiss: {
+            // 設定画面を閉じた時に設定ファイルを再読み込みしてAWS接続を検査
+            awsSettingsViewModel.loadAll()
+            Task { await awsSettingsViewModel.testConnection() }
+        }) { AWSSettingsView(viewModel: awsSettingsViewModel) }
         .onAppear {
             // 起動時に AWS 接続テスト → 失敗なら設定画面を開く
             Task {

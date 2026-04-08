@@ -24,7 +24,7 @@ struct AWSClientFactory {
     /// - Throws: 認証情報が無効な場合
     static func makeCredentialResolver() throws -> StaticAWSCredentialIdentityResolver? {
         let settings = AppSettingsStore().load()
-        let authMethod = AuthMethod(rawValue: settings.authMethod) ?? .accessKey
+        let authMethod = AuthMethod(rawValue: settings.authMethod) ?? .sso
 
         switch authMethod {
         case .accessKey:
@@ -61,6 +61,22 @@ struct AWSClientFactory {
                 // SSO プロファイル等: AWS_PROFILE 環境変数が設定済み、SDK デフォルトに委譲
                 return nil
             }
+
+        case .sso:
+            // IAM Identity Center（SSO）方式
+            // SSOAuthService のキャッシュからメモリ内の一時認証情報を取得
+            guard let creds = SSOAuthService.cachedCredentials else {
+                throw AWSClientFactoryError.ssoNotAuthenticated
+            }
+            guard creds.expiration > Date() else {
+                throw AWSClientFactoryError.ssoTokenExpired
+            }
+            let identity = AWSCredentialIdentity(
+                accessKey: creds.accessKeyId,
+                secret: creds.secretAccessKey,
+                sessionToken: creds.sessionToken
+            )
+            return StaticAWSCredentialIdentityResolver(identity)
         }
     }
 
@@ -74,7 +90,7 @@ struct AWSClientFactory {
     /// - Returns: リージョン文字列
     static func currentRegion() -> String {
         let settings = AppSettingsStore().load()
-        let authMethod = AuthMethod(rawValue: settings.authMethod) ?? .accessKey
+        let authMethod = AuthMethod(rawValue: settings.authMethod) ?? .sso
 
         if authMethod == .awsProfile {
             let profileName = settings.awsProfileName.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -85,7 +101,7 @@ struct AWSClientFactory {
             }
         }
 
-        // フォールバック: settings.json のリージョン
+        // SSO 方式・Access Key 方式共通: settings.json のリージョン（サービスリージョン）を使用
         return settings.region
     }
 
@@ -97,6 +113,10 @@ struct AWSClientFactory {
         case missingCredentials
         /// プロファイルが未選択
         case noProfileSelected
+        /// SSO 未認証
+        case ssoNotAuthenticated
+        /// SSO トークン期限切れ
+        case ssoTokenExpired
 
         var errorDescription: String? {
             switch self {
@@ -104,6 +124,10 @@ struct AWSClientFactory {
                 return "AWS 認証情報が設定されていません。設定画面から認証情報を入力してください。"
             case .noProfileSelected:
                 return "AWS プロファイルが選択されていません。設定画面からプロファイルを選択してください。"
+            case .ssoNotAuthenticated:
+                return "SSO ログインを実行してください。"
+            case .ssoTokenExpired:
+                return "認証情報が期限切れです。設定画面から SSO ログインを再実行してください。"
             }
         }
     }

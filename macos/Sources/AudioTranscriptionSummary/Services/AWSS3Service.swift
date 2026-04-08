@@ -89,6 +89,15 @@ final class AWSS3Service: S3ClientProtocol, Sendable {
         _ = try await s3Client.deleteObject(input: input)
     }
 
+    /// S3 バケット一覧を取得する
+    /// - Returns: バケット名の配列
+    /// - Throws: 一覧取得に失敗した場合
+    func listBuckets() async throws -> [String] {
+        let input = ListBucketsInput()
+        let output = try await s3Client.listBuckets(input: input)
+        return output.buckets?.compactMap { $0.name } ?? []
+    }
+
     // MARK: - ヘルパーメソッド
 
     /// AudioFile に対応する S3 オブジェクトキーを生成する

@@ -165,7 +165,7 @@
                                     <Button x:Name="CopyTranscriptBtn" IsEnabled="False" Click="OnCopyTranscript"><StackPanel Orientation="Horizontal" Spacing="4"><FontIcon Glyph="&#xE8C8;" FontSize="12" /><TextBlock Text="コピー" /></StackPanel></Button>
                                 </StackPanel>
                                 <TextBox x:Name="TranscriptText" TextWrapping="Wrap" IsReadOnly="True"
-                                         AcceptsReturn="True" Height="150"
+                                         AcceptsReturn="True" Height="200"
                                          ScrollViewer.VerticalScrollBarVisibility="Auto"
                                          BorderBrush="{ThemeResource SystemControlForegroundBaseMediumBrush}"
                                          BorderThickness="1" CornerRadius="4" Margin="4" Padding="8" />
@@ -178,7 +178,7 @@
                                     <Button x:Name="CopyTranscriptTransBtn" IsEnabled="False" Click="OnCopyTranscriptTranslation"><StackPanel Orientation="Horizontal" Spacing="4"><FontIcon Glyph="&#xE8C8;" FontSize="12" /><TextBlock Text="コピー" /></StackPanel></Button>
                                 </StackPanel>
                                 <TextBox x:Name="TranscriptTranslationText" TextWrapping="Wrap" IsReadOnly="True"
-                                         AcceptsReturn="True" Height="150"
+                                         AcceptsReturn="True" Height="200"
                                          ScrollViewer.VerticalScrollBarVisibility="Auto"
                                          BorderBrush="{ThemeResource SystemControlForegroundBaseMediumBrush}"
                                          BorderThickness="1" CornerRadius="4" Margin="4" Padding="8" />

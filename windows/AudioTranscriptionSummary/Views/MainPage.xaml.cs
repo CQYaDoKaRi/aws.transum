@@ -102,11 +102,19 @@ public sealed partial class MainPage : Page
         var splitOptions = new[] { 1, 5, 10, 15, 20, 30, 45, 60 };
         foreach (var min in splitOptions)
             SplitIntervalCombo.Items.Add($"{min}分");
-        SplitIntervalCombo.SelectedIndex = Array.IndexOf(splitOptions, 30); // デフォルト30分
+        // 設定から復元
+        var savedSplitIdx = Array.IndexOf(splitOptions, _vm.SplitIntervalMinutes);
+        SplitIntervalCombo.SelectedIndex = savedSplitIdx >= 0 ? savedSplitIdx : Array.IndexOf(splitOptions, 30);
         SplitIntervalCombo.SelectionChanged += (_, _) =>
         {
             if (SplitIntervalCombo.SelectedIndex >= 0 && SplitIntervalCombo.SelectedIndex < splitOptions.Length)
+            {
                 _vm.SplitIntervalMinutes = splitOptions[SplitIntervalCombo.SelectedIndex];
+                var store = new SettingsStore();
+                var s = store.Load();
+                s.SplitIntervalMinutes = _vm.SplitIntervalMinutes;
+                store.Save(s);
+            }
         };
 
         // Task 7.1: Hide realtime section when disabled

@@ -160,6 +160,7 @@ public partial class MainViewModel : ObservableObject
         // 追加プロンプトを設定から復元
         var savedSettings = _settingsStore.Load();
         SummaryAdditionalPrompt = savedSettings.SummaryAdditionalPrompt;
+        SplitIntervalMinutes = savedSettings.SplitIntervalMinutes;
     }
 
     private void LoadAudioSources()

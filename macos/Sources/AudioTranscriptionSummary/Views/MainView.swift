@@ -154,6 +154,12 @@ struct MainView: View {
                         }
                         .frame(width: 80)
                         .disabled(viewModel.isCapturingSystemAudio || viewModel.isRecordingScreen)
+                        .onChange(of: viewModel.splitIntervalMinutes) { _, newVal in
+                            let store = AppSettingsStore()
+                            var s = store.load()
+                            s.splitIntervalMinutes = newVal
+                            try? store.save(s)
+                        }
                         Spacer()
                     }
 
@@ -268,7 +274,7 @@ struct MainView: View {
                             Divider()
                             TranslationPanel(sourceText: viewModel.transcript?.text ?? "", translationVM: transcriptTranslationVM).frame(maxWidth: .infinity, maxHeight: .infinity)
                         }
-                        .frame(minHeight: 100)
+                        .frame(minHeight: 200)
                         .disabled(isAnyCapturing || viewModel.isProcessing)
                         .opacity(isAnyCapturing || viewModel.isProcessing ? 0.5 : 1.0)
                     }

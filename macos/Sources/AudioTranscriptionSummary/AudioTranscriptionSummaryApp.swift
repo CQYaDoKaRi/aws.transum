@@ -16,6 +16,15 @@ struct AudioTranscriptionSummaryApp: App {
     @StateObject private var appViewModel: AppViewModel
 
     init() {
+        // 二重起動防止: 同じバンドル ID のプロセスが既に起動中なら終了
+        let bundleId = Bundle.main.bundleIdentifier ?? "AudioTranscriptionSummary"
+        let running = NSRunningApplication.runningApplications(withBundleIdentifier: bundleId)
+        if running.count > 1 {
+            // 既存インスタンスをアクティブにして自身を終了
+            running.first?.activate()
+            DispatchQueue.main.async { NSApplication.shared.terminate(nil) }
+        }
+
         // Dock にアプリアイコンを表示する
         NSApplication.shared.setActivationPolicy(.regular)
         NSApplication.shared.applicationIconImage = Self.generateAppIcon()

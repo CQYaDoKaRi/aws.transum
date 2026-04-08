@@ -195,6 +195,26 @@
 3. WHEN リアルタイム文字起こしが有効にされた場合かつ録音中の場合、THE App SHALL リアルタイム文字起こしとリアルタイム翻訳を開始する
 4. WHEN リアルタイム文字起こしが有効にされた場合、THE App SHALL 既存のストリーム出力ファイルがあれば追記する
 
+### 要件 16: 設定の永続化（Settings Persistence）
+
+**ユーザーストーリー:** ユーザーとして、ファイル分割時間やリアルタイム文字起こしの ON/OFF 設定が次回起動時に復元されてほしい。それにより、毎回設定し直す手間を省きたい。
+
+#### 受け入れ基準（Acceptance Criteria）
+
+1. THE App SHALL ファイル分割間隔（splitIntervalMinutes）を設定ファイル（settings.json）に保存する
+2. THE App SHALL リアルタイム文字起こしの有効/無効（isRealtimeEnabled）を設定ファイルに保存する
+3. WHEN App が起動した場合、THE App SHALL 設定ファイルから分割間隔とリアルタイム設定を復元する
+4. THE App SHALL 設定変更時に即座に設定ファイルに保存する
+
+### 要件 17: 二重起動防止（Single Instance）
+
+**ユーザーストーリー:** ユーザーとして、アプリケーションが二重起動しないようにしたい。それにより、リソースの無駄遣いや設定の競合を防ぎたい。
+
+#### 受け入れ基準（Acceptance Criteria）
+
+1. WHEN 同じアプリケーションが既に起動中の場合、THE App SHALL 新しいインスタンスを起動せずに終了する
+2. THE App SHALL macOS では NSRunningApplication、Windows では Mutex を使用して二重起動を検出する
+
 ### 要件 12: アプリアイコン（Application Icon）
 
 **ユーザーストーリー:** ユーザーとして、Dock やアプリケーション一覧でアプリを視覚的に識別したい。それにより、他のアプリケーションと区別しやすくしたい。

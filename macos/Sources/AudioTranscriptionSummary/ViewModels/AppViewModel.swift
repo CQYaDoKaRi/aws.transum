@@ -213,8 +213,10 @@ class AppViewModel: ObservableObject {
         }
         // 画面録画のデリゲートを設定
         screenRecorder.delegate = self
-        // 追加プロンプトを設定から復元
-        summaryAdditionalPrompt = AppSettingsStore().load().summaryAdditionalPrompt
+        // 追加プロンプトと分割間隔を設定から復元
+        let savedSettings = AppSettingsStore().load()
+        summaryAdditionalPrompt = savedSettings.summaryAdditionalPrompt
+        splitIntervalMinutes = savedSettings.splitIntervalMinutes
     }
 
     // MARK: - deinit

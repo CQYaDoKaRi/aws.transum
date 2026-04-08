@@ -152,9 +152,16 @@ public class AudioCaptureService : IDisposable
         _capture.StopRecording();
         IsCapturing = false;
 
+        var lastPath = _outputPath;
         lock (_writerLock)
         {
             CleanupWriter();
+        }
+
+        // 最後の分割ファイルを通知
+        if (!string.IsNullOrEmpty(lastPath) && File.Exists(lastPath))
+        {
+            FileSplitCompleted?.Invoke(this, lastPath!);
         }
 
         // 全分割ファイルのパスリストを返す

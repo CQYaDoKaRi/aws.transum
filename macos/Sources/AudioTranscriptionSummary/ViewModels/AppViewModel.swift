@@ -54,6 +54,14 @@ class AppViewModel: ObservableObject {
     var isAllSelected: Bool {
         !fileList.isEmpty && fileList.allSatisfy { $0.isSelected }
     }
+    /// 波形描画用データ（0.0〜1.0 の正規化された振幅値）
+    @Published var waveformData: [Float] = []
+
+    /// 処理中かどうか（文字起こしまたは要約のいずれかが実行中）
+    var isProcessing: Bool {
+        isTranscribing || isSummarizing
+    }
+
     /// 再生中かどうか
     @Published var isPlaying: Bool = false
     /// 現在の再生位置（秒）
@@ -238,6 +246,8 @@ class AppViewModel: ObservableObject {
             transcript = nil
             summary = nil
             transcriptionProgress = 0
+            // 波形データを生成
+            waveformData = WaveformDataProvider.loadWaveformData(from: mediaFile.url)
             // 音声プレーヤーにファイルを読み込む
             try audioPlayer.load(audioFile: mediaFile)
             stopPlayback()
@@ -481,6 +491,8 @@ class AppViewModel: ObservableObject {
     /// ファイルリストの行タップで再生ファイルを切り替える
     func selectFileForPlayback(_ file: AudioFile) {
         audioFile = file
+        // 波形データを生成
+        waveformData = WaveformDataProvider.loadWaveformData(from: file.url)
         do {
             try audioPlayer.load(audioFile: file)
             stopPlayback()
@@ -731,11 +743,12 @@ class AppViewModel: ObservableObject {
     func startSystemAudioCapture() async {
         errorMessage = nil
         isStartingCapture = true
-        // ファイル選択をクリア
+        // ファイル選択・ファイルリストをクリア
         audioFile = nil
         transcript = nil
         summary = nil
         transcriptionProgress = 0
+        fileList.removeAll()
         await stopLevelPreview()
         do {
             try await systemAudioCapture.startCapture(sourceType: selectedAudioSource)
@@ -762,31 +775,31 @@ class AppViewModel: ObservableObject {
 
             let capturedFiles = try await systemAudioCapture.stopCapture()
 
-            // 最初の分割ファイルを audioFile にセット（互換性維持）
+            // 最初のファイルを audioFile にセット（プレーヤー用）
             if let firstFile = capturedFiles.first {
                 audioFile = firstFile
+            } else if let firstItem = fileList.first {
+                audioFile = firstItem.audioFile
             }
             transcript = nil
             summary = nil
             transcriptionProgress = 0
 
-            // 音声プレーヤーへの読み込み（最初のファイルを使用）
-            if let firstFile = capturedFiles.first {
+            // 音声プレーヤーへの読み込み
+            if let file = audioFile {
                 do {
-                    try audioPlayer.load(audioFile: firstFile)
+                    try audioPlayer.load(audioFile: file)
                 } catch {
                     ErrorLogger.saveErrorLog(error: error, operation: "録音_プレーヤー読み込み",
-                                             context: ["file": firstFile.url.path,
-                                                        "ext": firstFile.fileExtension])
+                                             context: ["file": file.url.path,
+                                                        "ext": file.fileExtension])
                 }
+                // 波形データを生成
+                waveformData = WaveformDataProvider.loadWaveformData(from: file.url)
             }
             stopPlayback()
 
-            // 全分割ファイルを fileList に追加（isSelected: true）
-            let newItems = capturedFiles.map { file in
-                FileListItem(id: UUID(), audioFile: file, isSelected: true)
-            }
-            fileList.append(contentsOf: newItems)
+            // fileList への追加は onFileSplitCompleted で実施済み
 
             convertingStatus = .completed
             isStoppingCapture = false
@@ -828,11 +841,12 @@ class AppViewModel: ObservableObject {
     func startScreenRecording() async {
         errorMessage = nil
         isStartingCapture = true
-        // ファイル選択をクリア
+        // ファイル選択・ファイルリストをクリア
         audioFile = nil
         transcript = nil
         summary = nil
         transcriptionProgress = 0
+        fileList.removeAll()
         screenRecorder.saveMode = .videoAndAudio
         do {
             try await screenRecorder.startRecording()
@@ -871,6 +885,9 @@ class AppViewModel: ObservableObject {
             summary = nil
             transcriptionProgress = 0
 
+            // ファイルリストに追加
+            fileList.append(FileListItem(id: UUID(), audioFile: capturedAudio, isSelected: true))
+
             // 音声プレーヤーへの読み込み（MOV の Float32 PCM は再生できない場合がある）
             do {
                 try audioPlayer.load(audioFile: capturedAudio)
@@ -879,6 +896,8 @@ class AppViewModel: ObservableObject {
                                          context: ["file": capturedAudio.url.path,
                                                     "ext": capturedAudio.fileExtension])
             }
+            // 波形データを生成
+            waveformData = WaveformDataProvider.loadWaveformData(from: capturedAudio.url)
             stopPlayback()
             convertingStatus = .completed
             isStoppingCapture = false

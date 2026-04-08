@@ -35,13 +35,6 @@ struct FileListView: View {
                 Spacer()
 
                 Button {
-                    isFileImporterPresented = true
-                } label: {
-                    Label("追加", systemImage: "plus").font(.caption2)
-                }
-                .controlSize(.small)
-
-                Button {
                     viewModel.removeFilesFromList(selectedIds)
                 } label: {
                     Label("削除", systemImage: "trash").font(.caption2)

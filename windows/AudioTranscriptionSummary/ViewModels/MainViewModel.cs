@@ -64,10 +64,26 @@ public partial class MainViewModel : ObservableObject
     [ObservableProperty] private double _statusProgress;
     [ObservableProperty] private bool _isProgressIndeterminate;
 
+    // 波形データ（波形表示用）
+    [ObservableProperty] private float[] _waveformData = Array.Empty<float>();
+
     // Status monitor display
     [ObservableProperty] private string _appCpuDisplay = "アプリ 0%";
     [ObservableProperty] private string _systemCpuDisplay = "全体 0%";
     [ObservableProperty] private string _memoryDisplay = "0 MB / 0 GB (0%)";
+
+    /// <summary>処理中かどうか（文字起こし中 または 要約中）</summary>
+    public bool IsProcessing => IsTranscribing || IsSummarizing;
+
+    partial void OnIsTranscribingChanged(bool value)
+    {
+        OnPropertyChanged(nameof(IsProcessing));
+    }
+
+    partial void OnIsSummarizingChanged(bool value)
+    {
+        OnPropertyChanged(nameof(IsProcessing));
+    }
 
     // Realtime & Translation ViewModels
     public RealtimeTranscriptionViewModel RealtimeTranscriptionVM { get; }
@@ -168,6 +184,8 @@ public partial class MainViewModel : ObservableObject
             OnPropertyChanged(nameof(AudioDuration));
             IsPlaying = false;
             PlaybackPosition = TimeSpan.Zero;
+            // 波形データを生成
+            WaveformData = WaveformDataProvider.LoadWaveformData(filePath);
         }
         catch (AppError ex)
         {
@@ -396,6 +414,7 @@ public partial class MainViewModel : ObservableObject
         Transcript = null;
         Summary = null;
         AudioFile = null;
+        FileList.Clear();
 
         // リアルタイム文字起こしのストリーム出力パスを設定
         var captureSettings = _settingsStore.Load();
@@ -531,29 +550,18 @@ public partial class MainViewModel : ObservableObject
             ProgressMessage = null;
             AudioLevel = 0;
 
-            // 全分割ファイルを FileList に追加
-            foreach (var filePath in filePaths)
-            {
-                try
-                {
-                    var audioFile = _fileImporter.Import(filePath);
-                    var item = new FileListItem(audioFile);
-                    FileList.Add(item);
-                }
-                catch (Exception ex)
-                {
-                    ErrorLogger.SaveErrorLog(ex, "分割ファイル読み込み", System.IO.Path.GetFileName(filePath));
-                }
-            }
+            // fileList への追加は FileSplitCompleted イベントで実施済み
 
-            // 最初のファイルをプレーヤーに読み込み（互換性維持）
-            if (filePaths.Count > 0)
+            // 最初のファイルをプレーヤーに読み込み
+            if (FileList.Count > 0)
             {
-                AudioFile = _fileImporter.Import(filePaths[0]);
-                _audioPlayerService.Load(filePaths[0]);
+                var firstFile = FileList[0].AudioFile;
+                AudioFile = firstFile;
+                _audioPlayerService.Load(firstFile.FilePath);
                 OnPropertyChanged(nameof(AudioDuration));
                 IsPlaying = false;
                 PlaybackPosition = TimeSpan.Zero;
+                WaveformData = WaveformDataProvider.LoadWaveformData(firstFile.FilePath);
             }
 
             CleanupRealtimeClient();
@@ -646,6 +654,8 @@ public partial class MainViewModel : ObservableObject
             OnPropertyChanged(nameof(AudioDuration));
             IsPlaying = false;
             PlaybackPosition = TimeSpan.Zero;
+            // 波形データを生成
+            WaveformData = WaveformDataProvider.LoadWaveformData(file.FilePath);
         }
         catch { /* プレーヤー読み込み失敗は無視 */ }
     }

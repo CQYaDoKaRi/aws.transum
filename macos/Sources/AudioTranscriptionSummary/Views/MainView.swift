@@ -81,7 +81,7 @@ struct MainView: View {
                     }
                 } label: { Image(systemName: "mic.circle.fill").foregroundStyle(.red).font(.title3) }
                     .help(viewModel.selectedAudioSource.isScreenRecording ? "録画開始" : "録音開始")
-                    .disabled(viewModel.isStartingCapture)
+                    .disabled(viewModel.isStartingCapture || viewModel.isProcessing)
             }
         }
         // キャンセルボタン
@@ -100,7 +100,7 @@ struct MainView: View {
         // 設定（右端）
         ToolbarItem(placement: .primaryAction) {
             Button { showSettings = true } label: { Label("設定", systemImage: "gearshape") }
-                .disabled(isAnyCapturing)
+                .disabled(isAnyCapturing || viewModel.isProcessing)
         }
     }
 
@@ -119,7 +119,7 @@ struct MainView: View {
                                 Label(source.displayName, systemImage: source.iconName).tag(source)
                             }
                         }
-                        .disabled(viewModel.isCapturingSystemAudio || viewModel.isRecordingScreen)
+                        .disabled(viewModel.isCapturingSystemAudio || viewModel.isRecordingScreen || viewModel.isProcessing)
                         .onChange(of: viewModel.selectedAudioSource) { _, newSource in
                             if !newSource.isScreenRecording {
                                 Task { await viewModel.startLevelPreview() }
@@ -135,6 +135,7 @@ struct MainView: View {
                         .toggleStyle(.switch)
                         .controlSize(.small)
                         .labelsHidden()
+                        .disabled(viewModel.isProcessing)
                         Text("リアルタイム文字起こし")
                             .font(.caption)
                             .onChange(of: awsSettingsViewModel.isRealtimeEnabled) { _, enabled in
@@ -187,6 +188,7 @@ struct MainView: View {
                 }
                 .padding(4)
                 .background(RoundedRectangle(cornerRadius: 8).fill(Color(.controlBackgroundColor)))
+                .opacity(viewModel.isProcessing ? 0.5 : 1.0)
                 .task { await viewModel.refreshAudioSources() }
             } statusContent: {
                 EmptyView()
@@ -223,21 +225,19 @@ struct MainView: View {
                                 isInputExpanded = false
                                 isRealtimeExpanded = false
                             }
-                        }, isDisabled: isAnyCapturing).padding(.horizontal, 8).padding(.top, 4).padding(.bottom, 2)
+                        }, isDisabled: isAnyCapturing || viewModel.isProcessing).padding(.horizontal, 8).padding(.top, 4).padding(.bottom, 2)
                         // ファイルリスト（ファイルがある場合のみ表示）
                         if !viewModel.fileList.isEmpty {
                             FileListView(viewModel: viewModel)
                                 .padding(.horizontal, 8)
                                 .padding(.vertical, 2)
-                                .disabled(isAnyCapturing)
-                                .opacity(isAnyCapturing ? 0.5 : 1.0)
+                                .disabled(isAnyCapturing || viewModel.isProcessing)
+                                .opacity(isAnyCapturing || viewModel.isProcessing ? 0.5 : 1.0)
                         }
                         AudioPlayerView(viewModel: viewModel)
                             .padding(.horizontal, 8).padding(.vertical, 2)
-                            .disabled(isAnyCapturing)
-                            .opacity(isAnyCapturing ? 0.5 : 1.0)
-                        // オーディオスペクトラム
-                        AudioSpectrumView(viewModel: viewModel, audioLevel: isAnyCapturing ? viewModel.captureAudioLevel : (viewModel.isPlaying ? 0.5 : 0))
+                            .disabled(isAnyCapturing || viewModel.isProcessing)
+                            .opacity(isAnyCapturing || viewModel.isProcessing ? 0.5 : 1.0)
                         Divider()
                         HStack(spacing: 0) {
                             TranscriptView(viewModel: viewModel).frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -245,8 +245,8 @@ struct MainView: View {
                             TranslationPanel(sourceText: viewModel.transcript?.text ?? "", translationVM: transcriptTranslationVM).frame(maxWidth: .infinity, maxHeight: .infinity)
                         }
                         .frame(minHeight: 100)
-                        .disabled(isAnyCapturing)
-                        .opacity(isAnyCapturing ? 0.5 : 1.0)
+                        .disabled(isAnyCapturing || viewModel.isProcessing)
+                        .opacity(isAnyCapturing || viewModel.isProcessing ? 0.5 : 1.0)
                     }
                 }
                 Divider()
@@ -263,7 +263,7 @@ struct MainView: View {
                                 }
                                 .pickerStyle(.menu)
                                 .frame(width: 200)
-                                .disabled(viewModel.isSummarizing)
+                                .disabled(viewModel.isSummarizing || viewModel.isProcessing)
                                 .onChange(of: awsSettingsViewModel.bedrockModelId) { _, _ in
                                     awsSettingsViewModel.saveBedrockModelSetting()
                                 }
@@ -295,14 +295,14 @@ struct MainView: View {
                                             .font(.caption).frame(maxWidth: .infinity)
                                     }
                                     .controlSize(.small)
-                                    .disabled(isAnyCapturing)
+                                    .disabled(isAnyCapturing || viewModel.isProcessing)
                                     Button {
                                         Task { await viewModel.resummarize() }
                                     } label: {
                                         Label("要約", systemImage: "text.magnifyingglass")
                                             .font(.caption).frame(maxWidth: .infinity)
                                     }
-                                    .disabled(viewModel.transcript == nil || viewModel.isSummarizing)
+                                    .disabled(viewModel.transcript == nil || viewModel.isSummarizing || viewModel.isProcessing)
                                     .controlSize(.small)
                                 }
                                 .frame(width: 110)

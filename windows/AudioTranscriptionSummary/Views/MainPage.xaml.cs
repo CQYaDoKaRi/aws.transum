@@ -128,7 +128,6 @@ public sealed partial class MainPage : Page
             {
                 case nameof(MainViewModel.AudioLevel):
                     LevelMeter.Value = _vm.AudioLevel;
-                    UpdateSpectrumBars(_vm.AudioLevel);
                     break;
                 case nameof(MainViewModel.IsCapturing):
                     UpdateRecordingUI();
@@ -188,6 +187,9 @@ public sealed partial class MainPage : Page
                     break;
                 case nameof(MainViewModel.MemoryDisplay):
                     MemoryText.Text = _vm.MemoryDisplay;
+                    break;
+                case nameof(MainViewModel.IsProcessing):
+                    UpdateProcessingUI();
                     break;
             }
         };
@@ -314,6 +316,24 @@ public sealed partial class MainPage : Page
         CancelButton.IsEnabled = !_vm.IsStartingCapture && !_vm.IsStoppingCapture;
     }
 
+    /// <summary>処理中（文字起こし/要約）のGUI操作無効化を更新する</summary>
+    private void UpdateProcessingUI()
+    {
+        var processing = _vm.IsProcessing;
+        RecordButton.IsEnabled = !processing;
+        SettingsButton.IsEnabled = !processing;
+        FilePickButton.IsEnabled = !processing;
+        DropZone.AllowDrop = !processing;
+        AudioSourcePicker.IsEnabled = !processing;
+        TranscriptionLangCombo.IsEnabled = !processing;
+        BedrockModelCombo.IsEnabled = !processing;
+        SummaryFileBtn.IsEnabled = !processing;
+        ResummarizeBtn.IsEnabled = !processing;
+        RealtimeToggle.IsEnabled = !processing;
+        FileListPanel.IsEnabled = !processing;
+        PlayerPanel.IsEnabled = !processing;
+    }
+
     private void UpdateFileInfo()
     {
         if (_vm.AudioFile != null)
@@ -321,60 +341,13 @@ public sealed partial class MainPage : Page
             var af = _vm.AudioFile;
             FileInfoText.Text = $"{af.FileName} ({af.Extension}) - {af.Duration:mm\\:ss}";
             PlayerPanel.Visibility = Visibility.Visible;
-            PositionSlider.Maximum = _vm.AudioDuration.TotalSeconds;
-            SpectrumPanel.Visibility = Visibility.Visible;
-            InitializeSpectrumBars();
+            // 波形を描画
+            DrawWaveform(WaveformCanvas, _vm.WaveformData, 0);
         }
         else
         {
             FileInfoText.Text = "";
             PlayerPanel.Visibility = Visibility.Collapsed;
-            SpectrumPanel.Visibility = Visibility.Collapsed;
-        }
-    }
-
-    /// スペクトラムバーを初期化する
-    private void InitializeSpectrumBars()
-    {
-        if (SpectrumBars.Children.Count == 0)
-        {
-            for (int i = 0; i < 32; i++)
-            {
-                var bar = new Microsoft.UI.Xaml.Shapes.Rectangle
-                {
-                    Width = 4,
-                    Height = 1,
-                    Fill = new Microsoft.UI.Xaml.Media.SolidColorBrush(Microsoft.UI.Colors.Green),
-                    RadiusX = 1,
-                    RadiusY = 1,
-                    VerticalAlignment = VerticalAlignment.Bottom
-                };
-                SpectrumBars.Children.Add(bar);
-            }
-        }
-    }
-
-    /// スペクトラムバーを音声レベルに応じて更新する
-    private void UpdateSpectrumBars(float level)
-    {
-        if (SpectrumBars.Children.Count == 0) return;
-        var maxHeight = 28.0;
-        for (int i = 0; i < SpectrumBars.Children.Count; i++)
-        {
-            if (SpectrumBars.Children[i] is Microsoft.UI.Xaml.Shapes.Rectangle bar)
-            {
-                // 中央が高く端が低い山型
-                var center = SpectrumBars.Children.Count / 2.0;
-                var dist = Math.Abs(i - center) / center;
-                var baseH = Math.Max(0, 1 - dist * 0.7) * level;
-                var variation = ((i * 7 + (int)(level * 100)) % 10) / 20.0f;
-                var h = Math.Clamp(baseH + variation * level, 0, 1);
-                bar.Height = Math.Max(1, maxHeight * h);
-                bar.Fill = new Microsoft.UI.Xaml.Media.SolidColorBrush(
-                    h > 0.7 ? Microsoft.UI.Colors.Red :
-                    h > 0.4 ? Microsoft.UI.Colors.Yellow :
-                    Microsoft.UI.Colors.Green);
-            }
         }
     }
 
@@ -383,8 +356,9 @@ public sealed partial class MainPage : Page
         var cur = _vm.PlaybackPosition;
         var dur = _vm.AudioDuration;
         TimeText.Text = $"{cur:mm\\:ss} / {dur:mm\\:ss}";
-        if (!_isSliderDragging)
-            PositionSlider.Value = cur.TotalSeconds;
+        // 再生位置に応じて波形を再描画
+        var progress = dur.TotalSeconds > 0 ? cur.TotalSeconds / dur.TotalSeconds : 0;
+        DrawWaveform(WaveformCanvas, _vm.WaveformData, progress);
     }
 
     // Record / Stop / Cancel
@@ -412,13 +386,84 @@ public sealed partial class MainPage : Page
     private void OnPlayPause(object sender, RoutedEventArgs e)
         => _vm.TogglePlaybackCommand.Execute(null);
 
-    // Slider
-    private bool _isSliderDragging;
-    private void OnPositionSliderChanged(object sender, Microsoft.UI.Xaml.Controls.Primitives.RangeBaseValueChangedEventArgs e)
+    // 波形キャンバスのポインタ操作でシーク
+    private bool _isWaveformDragging;
+
+    private void OnWaveformPointerPressed(object sender, PointerRoutedEventArgs e)
     {
-        if (Math.Abs(e.NewValue - _vm.PlaybackPosition.TotalSeconds) > 0.5)
+        if (sender is not Canvas canvas) return;
+        _isWaveformDragging = true;
+        canvas.CapturePointer(e.Pointer);
+        SeekFromPointer(canvas, e);
+    }
+
+    private void OnWaveformPointerMoved(object sender, PointerRoutedEventArgs e)
+    {
+        if (!_isWaveformDragging) return;
+        if (sender is not Canvas canvas) return;
+        SeekFromPointer(canvas, e);
+    }
+
+    /// <summary>ポインタ位置から再生位置を計算してシークする</summary>
+    private void SeekFromPointer(Canvas canvas, PointerRoutedEventArgs e)
+    {
+        var point = e.GetCurrentPoint(canvas);
+        var width = canvas.ActualWidth;
+        if (width <= 0) return;
+        var ratio = Math.Clamp(point.Position.X / width, 0, 1);
+        var seekSeconds = ratio * _vm.AudioDuration.TotalSeconds;
+        _vm.SeekCommand.Execute(seekSeconds);
+
+        // ポインタリリース時にドラッグ終了
+        if (!point.Properties.IsLeftButtonPressed)
         {
-            _vm.SeekCommand.Execute(e.NewValue);
+            _isWaveformDragging = false;
+            canvas.ReleasePointerCapture(e.Pointer);
+        }
+    }
+
+    /// <summary>Canvas 上に波形バーを描画する</summary>
+    private static void DrawWaveform(Canvas canvas, float[] waveformData, double progress)
+    {
+        canvas.Children.Clear();
+        if (waveformData == null || waveformData.Length == 0) return;
+
+        var canvasWidth = canvas.ActualWidth;
+        var canvasHeight = canvas.ActualHeight;
+        if (canvasWidth <= 0 || canvasHeight <= 0) return;
+
+        int barCount = waveformData.Length;
+        // バー幅と間隔を計算
+        double totalBarWidth = canvasWidth / barCount;
+        double barWidth = Math.Max(1, totalBarWidth * 0.75);
+        double gap = totalBarWidth - barWidth;
+
+        // 再生済みバーの境界インデックス
+        int playedBars = (int)(progress * barCount);
+
+        var playedBrush = new Microsoft.UI.Xaml.Media.SolidColorBrush(
+            Microsoft.UI.ColorHelper.FromArgb(255, 0, 120, 212)); // #0078D4
+        var unplayedBrush = new Microsoft.UI.Xaml.Media.SolidColorBrush(
+            Microsoft.UI.ColorHelper.FromArgb(255, 192, 192, 192)); // #C0C0C0
+
+        for (int i = 0; i < barCount; i++)
+        {
+            var amplitude = waveformData[i];
+            var barHeight = Math.Max(2, amplitude * canvasHeight);
+            var x = i * totalBarWidth + gap / 2;
+            var y = (canvasHeight - barHeight) / 2;
+
+            var rect = new Microsoft.UI.Xaml.Shapes.Rectangle
+            {
+                Width = barWidth,
+                Height = barHeight,
+                Fill = i < playedBars ? playedBrush : unplayedBrush,
+                RadiusX = 1,
+                RadiusY = 1
+            };
+            Canvas.SetLeft(rect, x);
+            Canvas.SetTop(rect, y);
+            canvas.Children.Add(rect);
         }
     }
 
@@ -872,26 +917,6 @@ public sealed partial class MainPage : Page
     {
         _vm.ToggleSelectAll();
         UpdateFileListUI();
-    }
-
-    // ファイルリスト: ファイル追加ボタン
-    private async void OnFileListAddClick(object sender, RoutedEventArgs e)
-    {
-        var picker = new FileOpenPicker();
-        picker.SuggestedStartLocation = PickerLocationId.MusicLibrary;
-        foreach (var ext in FileImporter.SupportedExtensions)
-            picker.FileTypeFilter.Add(ext);
-
-        var hwnd = GetWindowHandle();
-        if (hwnd != IntPtr.Zero)
-            WinRT.Interop.InitializeWithWindow.Initialize(picker, hwnd);
-
-        var files = await picker.PickMultipleFilesAsync();
-        if (files != null && files.Count > 0)
-        {
-            _vm.AddFilesToList(files.Select(f => f.Path));
-            UpdateFileListUI();
-        }
     }
 
     // ファイルリスト: 選択ファイル削除ボタン

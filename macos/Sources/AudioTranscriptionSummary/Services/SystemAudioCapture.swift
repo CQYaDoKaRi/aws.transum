@@ -349,6 +349,31 @@ final class SystemAudioCapture: NSObject, @unchecked Sendable {
         }
 
         isCapturing = false
+
+        // 最後の分割ファイルを通知（stopCapture で確定されたファイル）
+        if let lastURL = finalFileURL {
+            let asset = AVAsset(url: lastURL)
+            let duration: TimeInterval
+            if #available(macOS 12.0, *) {
+                duration = (try? await asset.load(.duration).seconds) ?? 0
+            } else {
+                duration = asset.duration.seconds
+            }
+            let attrs = try? FileManager.default.attributesOfItem(atPath: lastURL.path)
+            let size = attrs?[.size] as? Int64 ?? 0
+            if size > 0 {
+                let file = AudioFile(
+                    id: UUID(), url: lastURL,
+                    fileName: lastURL.deletingPathExtension().lastPathComponent,
+                    fileExtension: "m4a", duration: duration,
+                    fileSize: size, createdAt: Date()
+                )
+                await MainActor.run { [weak self] in
+                    self?.onFileSplitCompleted?(file)
+                }
+            }
+        }
+
         await MainActor.run { [weak self] in self?.delegate?.captureDidStop() }
 
         // 分割ファイル一覧から AudioFile 配列を生成

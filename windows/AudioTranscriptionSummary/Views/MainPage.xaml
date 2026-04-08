@@ -113,12 +113,9 @@
                         <!-- ファイルリスト -->
                         <Border x:Name="FileListPanel" BorderBrush="{ThemeResource SystemControlForegroundBaseMediumBrush}" BorderThickness="1" CornerRadius="4" Margin="8,4" Padding="0" Visibility="Collapsed">
                             <StackPanel>
-                                <!-- ヘッダー: 全選択 + 追加 + 削除 -->
+                                <!-- ヘッダー: 全選択 + 削除 -->
                                 <StackPanel Orientation="Horizontal" Spacing="8" Padding="8,4">
                                     <CheckBox x:Name="FileListSelectAllCheck" Content="全選択" Click="OnFileListSelectAllClick" VerticalAlignment="Center" MinWidth="0" Padding="4,0" />
-                                    <Button x:Name="FileListAddBtn" Click="OnFileListAddClick" Padding="4,2">
-                                        <StackPanel Orientation="Horizontal" Spacing="4"><FontIcon Glyph="&#xE710;" FontSize="12" /><TextBlock Text="追加" FontSize="12" /></StackPanel>
-                                    </Button>
                                     <Button x:Name="FileListRemoveBtn" Click="OnFileListRemoveClick" Padding="4,2">
                                         <StackPanel Orientation="Horizontal" Spacing="4"><FontIcon Glyph="&#xE74D;" FontSize="12" /><TextBlock Text="削除" FontSize="12" /></StackPanel>
                                     </Button>
@@ -144,12 +141,10 @@
                         <Grid x:Name="PlayerPanel" Padding="8,4" Visibility="Collapsed">
                             <Grid.ColumnDefinitions><ColumnDefinition Width="Auto" /><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
                             <Button x:Name="PlayPauseButton" Content="&#xE768;" FontFamily="Segoe MDL2 Assets" Click="OnPlayPause" Width="36" Height="36" Grid.Column="0" />
-                            <Slider x:Name="PositionSlider" Minimum="0" Margin="8,0" ValueChanged="OnPositionSliderChanged" Grid.Column="1" />
+                            <Canvas x:Name="WaveformCanvas" Height="40" Margin="8,0" Background="Transparent"
+                                    PointerPressed="OnWaveformPointerPressed" PointerMoved="OnWaveformPointerMoved"
+                                    Grid.Column="1" />
                             <TextBlock x:Name="TimeText" Text="00:00 / 00:00" VerticalAlignment="Center" FontSize="12" Grid.Column="2" />
-                        </Grid>
-                        <!-- オーディオスペクトラム -->
-                        <Grid x:Name="SpectrumPanel" Height="30" Margin="8,2" Visibility="Collapsed">
-                            <StackPanel x:Name="SpectrumBars" Orientation="Horizontal" Spacing="1" HorizontalAlignment="Stretch" />
                         </Grid>
                         <TextBlock x:Name="FileInfoText" Padding="8,2" FontSize="12" Foreground="{ThemeResource SystemControlForegroundBaseMediumBrush}" />
                         <Grid>

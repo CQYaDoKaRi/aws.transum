@@ -55,6 +55,8 @@ public sealed partial class MainPage : Page
         foreach (var lang in transcriptionLangs)
             RealtimeLangCombo.Items.Add(lang.ToDisplayName());
         RealtimeLangCombo.SelectedIndex = 0; // Auto
+        // Auto選択時は再判別ボタンを表示
+        RedetectLangBtn.Visibility = Visibility.Visible;
         RealtimeLangCombo.SelectionChanged += (_, _) =>
         {
             if (RealtimeLangCombo.SelectedIndex >= 0)
@@ -312,9 +314,13 @@ public sealed partial class MainPage : Page
         SummaryFileBtn.IsEnabled = !_vm.IsCapturing;
         ResummarizeBtn.IsEnabled = !_vm.IsCapturing;
 
+        SplitIntervalCombo.IsEnabled = !_vm.IsCapturing;
+        AudioSourcePicker.IsEnabled = !_vm.IsCapturing;
         // 録音中は音声文字起こしエリア内の GUI を無効化
-        FileListPanel.IsEnabled = !_vm.IsCapturing;
-        PlayerPanel.IsEnabled = !_vm.IsCapturing;
+        FileListPanel.IsHitTestVisible = !_vm.IsCapturing;
+        FileListPanel.Opacity = _vm.IsCapturing ? 0.5 : 1.0;
+        PlayerPanel.IsHitTestVisible = !_vm.IsCapturing;
+        PlayerPanel.Opacity = _vm.IsCapturing ? 0.5 : 1.0;
         TranscribeButton.IsEnabled = !_vm.IsCapturing && _vm.AudioFile != null;
         TranscriptionLangCombo.IsEnabled = !_vm.IsCapturing && _vm.AudioFile != null;
 
@@ -327,6 +333,8 @@ public sealed partial class MainPage : Page
         }
         else
         {
+            InputSection.IsExpanded = false;
+            RealtimeSection.IsExpanded = false;
             TranscriptSection.IsExpanded = true;
             SummarySection.IsExpanded = true;
         }
@@ -355,8 +363,10 @@ public sealed partial class MainPage : Page
         SummaryFileBtn.IsEnabled = !processing;
         ResummarizeBtn.IsEnabled = !processing;
         RealtimeToggle.IsEnabled = !processing;
-        FileListPanel.IsEnabled = !processing;
-        PlayerPanel.IsEnabled = !processing;
+        FileListPanel.IsHitTestVisible = !processing;
+        FileListPanel.Opacity = processing ? 0.5 : 1.0;
+        PlayerPanel.IsHitTestVisible = !processing;
+        PlayerPanel.Opacity = processing ? 0.5 : 1.0;
     }
 
     private void UpdateFileInfo()

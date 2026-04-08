@@ -32,6 +32,10 @@ struct AppSettings: Codable, Equatable {
     var summaryAdditionalPrompt: String = ""
     /// ファイル分割間隔（分）。1〜60、デフォルト30
     var splitIntervalMinutes: Int = 30
+    /// 認証方式（"accessKey" または "awsProfile"）
+    var authMethod: String = "accessKey"
+    /// 選択された AWS プロファイル名
+    var awsProfileName: String = ""
 }
 
 // MARK: - AppSettingsStore（設定ファイル管理）

@@ -29,7 +29,6 @@ struct AWSSettingsView: View {
                 Image(systemName: "gearshape.fill").foregroundColor(.accentColor)
                 Text("アプリ設定").font(.headline)
                 Spacer()
-                connectionStatusBadge
                 Button("閉じる") { dismiss() }.buttonStyle(.bordered).keyboardShortcut(.cancelAction)
             }
             .padding()
@@ -75,15 +74,62 @@ struct AWSSettingsView: View {
 
                     // 認証情報
                     settingsGroup(title: "認証情報", icon: "key.fill") {
-                        settingsRow("Access Key ID") {
-                            TextField("Access Key ID を入力", text: $viewModel.accessKeyId)
-                                .textFieldStyle(.squareBorder)
-                                .focusable()
+                        // 認証方式の切り替え（セグメントコントロール）
+                        settingsRow("認証方式") {
+                            Picker("", selection: $viewModel.authMethod) {
+                                ForEach(AuthMethod.allCases) { method in
+                                    Text(method.displayName).tag(method)
+                                }
+                            }
+                            .pickerStyle(.segmented)
                         }
-                        settingsRow("Secret Access Key") {
-                            SecureField("Secret Access Key を入力", text: $viewModel.secretAccessKey)
-                                .textFieldStyle(.squareBorder)
-                                .focusable()
+
+                        // Access Key 方式: Access Key ID / Secret Access Key フィールドを表示
+                        if viewModel.authMethod == .accessKey {
+                            settingsRow("Access Key ID") {
+                                TextField("Access Key ID を入力", text: $viewModel.accessKeyId)
+                                    .textFieldStyle(.squareBorder)
+                                    .focusable()
+                            }
+                            settingsRow("Secret Access Key") {
+                                SecureField("Secret Access Key を入力", text: $viewModel.secretAccessKey)
+                                    .textFieldStyle(.squareBorder)
+                                    .focusable()
+                            }
+                        }
+
+                        // AWS Profile 方式: プロファイル Picker + リフレッシュボタンを表示
+                        if viewModel.authMethod == .awsProfile {
+                            settingsRow("プロファイル") {
+                                HStack(spacing: 8) {
+                                    if viewModel.availableProfiles.isEmpty {
+                                        Text("プロファイルなし")
+                                            .foregroundColor(.secondary)
+                                            .frame(maxWidth: .infinity, alignment: .leading)
+                                    } else {
+                                        Picker("", selection: $viewModel.selectedProfileName) {
+                                            ForEach(viewModel.availableProfiles, id: \.self) { profile in
+                                                Text(profile).tag(profile)
+                                            }
+                                        }
+                                        .frame(maxWidth: .infinity)
+                                    }
+                                    Button {
+                                        viewModel.refreshProfiles()
+                                    } label: {
+                                        Image(systemName: "arrow.clockwise")
+                                    }
+                                    .buttonStyle(.borderless)
+                                    .help("プロファイル一覧を再読み込み")
+                                }
+                            }
+
+                            // プロファイル読み込みエラー表示
+                            if let error = viewModel.profileLoadError {
+                                Label(error, systemImage: "exclamationmark.triangle.fill")
+                                    .foregroundColor(.orange)
+                                    .font(.caption)
+                            }
                         }
                     }
 
@@ -103,16 +149,9 @@ struct AWSSettingsView: View {
                         }
                     }
 
-                    // フィードバック
+                    // エラーメッセージ（バリデーション用）
                     if let err = viewModel.errorMessage {
                         Label(err, systemImage: "exclamationmark.triangle.fill").foregroundColor(.red).font(.caption)
-                    }
-                    if viewModel.isSaved && viewModel.errorMessage == nil && !viewModel.isTesting {
-                        Label("認証情報は保存済みです", systemImage: "checkmark.circle.fill").foregroundColor(.green).font(.caption)
-                    }
-                    if let result = viewModel.connectionTestResult {
-                        Label(result, systemImage: viewModel.connectionTestSuccess ? "checkmark.circle.fill" : "xmark.circle.fill")
-                            .foregroundColor(viewModel.connectionTestSuccess ? .green : .red).font(.caption)
                     }
 
                     // 操作ボタン
@@ -131,6 +170,31 @@ struct AWSSettingsView: View {
                 }
                 .padding()
             }
+
+            // ステータスバー（下部固定）
+            Divider()
+            HStack(spacing: 8) {
+                if viewModel.isTesting {
+                    ProgressView().controlSize(.small)
+                    Text("接続テスト中...").font(.caption).foregroundStyle(.secondary)
+                } else if viewModel.connectionTestSuccess {
+                    Circle().fill(.green).frame(width: 8, height: 8)
+                    Text("AWS 接続済み").font(.caption).foregroundStyle(.green)
+                } else if let result = viewModel.connectionTestResult {
+                    Circle().fill(.red).frame(width: 8, height: 8)
+                    Text(result).font(.caption).foregroundStyle(.red).lineLimit(2)
+                } else if viewModel.isSaved {
+                    Circle().fill(.yellow).frame(width: 8, height: 8)
+                    Text("未検証 — 接続テストを実行してください").font(.caption).foregroundStyle(.secondary)
+                } else {
+                    Circle().fill(.gray).frame(width: 8, height: 8)
+                    Text("AWS 未設定").font(.caption).foregroundStyle(.secondary)
+                }
+                Spacer()
+            }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 6)
+            .background(Color(.controlBackgroundColor).opacity(0.5))
         }
         .frame(minWidth: 550, minHeight: 500)
         .onAppear {
@@ -161,18 +225,4 @@ struct AWSSettingsView: View {
         }
     }
 
-    // MARK: - 接続ステータスバッジ
-
-    @ViewBuilder
-    private var connectionStatusBadge: some View {
-        if viewModel.isTesting {
-            HStack(spacing: 4) { ProgressView().controlSize(.small); Text("テスト中").font(.caption).foregroundColor(.secondary) }
-        } else if viewModel.connectionTestSuccess {
-            HStack(spacing: 4) { Circle().fill(.green).frame(width: 8, height: 8); Text("接続済み").font(.caption).foregroundColor(.green) }
-        } else if viewModel.isSaved {
-            HStack(spacing: 4) { Circle().fill(.yellow).frame(width: 8, height: 8); Text("未検証").font(.caption).foregroundColor(.secondary) }
-        } else {
-            HStack(spacing: 4) { Circle().fill(.gray).frame(width: 8, height: 8); Text("未設定").font(.caption).foregroundColor(.secondary) }
-        }
-    }
 }

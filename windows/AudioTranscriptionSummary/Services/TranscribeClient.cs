@@ -31,16 +31,12 @@ public class TranscribeClient
     {
         // 1. Validate credentials (progress 0.1)
         var settings = _settingsStore.Load();
-        if (string.IsNullOrWhiteSpace(settings.AccessKeyId) ||
-            string.IsNullOrWhiteSpace(settings.SecretAccessKey))
-        {
-            throw new AppError(AppErrorType.CredentialsNotSet,
-                "AWS認証情報が設定されていません");
-        }
+        var credentials = AWSClientFactory.MakeCredentials(_settingsStore);
+        var region = AWSClientFactory.ResolveRegionEndpoint(_settingsStore);
 
         progress.Report(0.1);
 
-        var s3Service = new S3Service(settings.AccessKeyId, settings.SecretAccessKey, settings.Region);
+        var s3Service = new S3Service(credentials, region);
         var s3Key = S3Service.GenerateKey(audioFile.Extension);
         var jobName = $"ats-{Guid.NewGuid():N}";
 
@@ -54,7 +50,7 @@ public class TranscribeClient
             // 3. Start transcription job (progress 0.4)
             ct.ThrowIfCancellationRequested();
             var s3Uri = $"s3://{settings.S3BucketName}/{s3Key}";
-            var transcribeClient = CreateTranscribeServiceClient(settings);
+            var transcribeClient = CreateTranscribeServiceClient(credentials, region);
 
             var startRequest = new StartTranscriptionJobRequest
             {
@@ -191,10 +187,9 @@ public class TranscribeClient
         return transcripts[0].GetProperty("transcript").GetString() ?? "";
     }
 
-    private static AmazonTranscribeServiceClient CreateTranscribeServiceClient(AppSettings settings)
+    private static AmazonTranscribeServiceClient CreateTranscribeServiceClient(AWSCredentials credentials, RegionEndpoint region)
     {
-        var credentials = new BasicAWSCredentials(settings.AccessKeyId, settings.SecretAccessKey);
-        return new AmazonTranscribeServiceClient(credentials, RegionEndpoint.GetBySystemName(settings.Region));
+        return new AmazonTranscribeServiceClient(credentials, region);
     }
 
     private static string MapMediaFormat(string extension)
@@ -266,15 +261,11 @@ public class TranscribeClient
 
     public async Task<bool> TestConnectionAsync()
     {
+        var credentials = AWSClientFactory.MakeCredentials(_settingsStore);
+        var region = AWSClientFactory.ResolveRegionEndpoint(_settingsStore);
         var settings = _settingsStore.Load();
-        if (string.IsNullOrWhiteSpace(settings.AccessKeyId) ||
-            string.IsNullOrWhiteSpace(settings.SecretAccessKey))
-        {
-            throw new AppError(AppErrorType.CredentialsNotSet,
-                "AWS認証情報が設定されていません");
-        }
 
-        var s3Service = new S3Service(settings.AccessKeyId, settings.SecretAccessKey, settings.Region);
+        var s3Service = new S3Service(credentials, region);
         var testKey = $".connection-test-{Guid.NewGuid()}";
 
         try

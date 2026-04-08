@@ -3,6 +3,7 @@
 
 import Foundation
 import AWSTranslate
+import SmithyIdentity
 
 // MARK: - TranslateService
 
@@ -89,9 +90,21 @@ final class TranslateService: Sendable {
         to targetLanguage: String,
         region: String
     ) async throws -> String {
-        let config = try await TranslateClient.TranslateClientConfiguration(
-            region: region
-        )
+        // AWSClientFactory 経由で認証情報を解決
+        let resolver = try AWSClientFactory.makeCredentialResolver()
+
+        let config: TranslateClient.TranslateClientConfiguration
+        if let resolver = resolver {
+            config = try await TranslateClient.TranslateClientConfiguration(
+                awsCredentialIdentityResolver: resolver,
+                region: region
+            )
+        } else {
+            // SSO プロファイル等: SDK デフォルトの credential resolver を使用
+            config = try await TranslateClient.TranslateClientConfiguration(
+                region: region
+            )
+        }
         let client = TranslateClient(config: config)
 
         var lastError: Error?

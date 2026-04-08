@@ -80,6 +80,7 @@ rm -rf "$ICONSET_DIR"
 mkdir -p "$ICONSET_DIR"
 
 # Python でアイコン PNG を生成（CoreGraphics 不要、シンプルな方法）
+export ICONSET_DIR
 python3 << 'PYEOF'
 import struct, zlib, os, sys
 

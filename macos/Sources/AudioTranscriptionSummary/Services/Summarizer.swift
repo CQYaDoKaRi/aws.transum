@@ -5,7 +5,6 @@
 import Foundation
 import NaturalLanguage
 import AWSBedrockRuntime
-import AWSSDKIdentity
 
 final class Summarizer: Summarizing, @unchecked Sendable {
 
@@ -28,7 +27,7 @@ final class Summarizer: Summarizing, @unchecked Sendable {
                 // Bedrock エラーの詳細を取得
                 let modelId = AWSSettingsViewModel.currentBedrockModelId
                 let modelName = BedrockModel.find(by: modelId)?.name ?? modelId
-                let region = AWSSettingsViewModel.currentRegion
+                let region = AWSClientFactory.currentRegion()
                 let errorDetail = "\(error)"
 
                 ErrorLogger.saveErrorLog(error: error, operation: "Bedrock要約失敗_フォールバック",
@@ -52,22 +51,24 @@ final class Summarizer: Summarizing, @unchecked Sendable {
     // MARK: - Bedrock（Claude）要約
 
     private func summarizeWithBedrock(text: String, additionalPrompt: String = "") async throws -> String {
-        let region = AWSSettingsViewModel.currentRegion
+        let region = AWSClientFactory.currentRegion()
 
-        // アプリ設定の認証情報を使用
-        guard let credentials = AWSSettingsViewModel.loadAWSCredentials() else {
-            throw AppError.summarizationFailed(
-                underlying: NSError(domain: "Summarizer", code: -2,
-                                    userInfo: [NSLocalizedDescriptionKey: "AWS 認証情報が設定されていません"]))
+        // AWSClientFactory 経由で認証情報を解決
+        let resolver = try AWSClientFactory.makeCredentialResolver()
+
+        var configBuilder: BedrockRuntimeClient.BedrockRuntimeClientConfiguration
+        if let resolver = resolver {
+            configBuilder = try await BedrockRuntimeClient.BedrockRuntimeClientConfiguration(
+                awsCredentialIdentityResolver: resolver,
+                region: region
+            )
+        } else {
+            // SSO プロファイル等: SDK デフォルトの credential resolver を使用
+            configBuilder = try await BedrockRuntimeClient.BedrockRuntimeClientConfiguration(
+                region: region
+            )
         }
-
-        let config = try await BedrockRuntimeClient.BedrockRuntimeClientConfiguration(
-            awsCredentialIdentityResolver: try StaticAWSCredentialIdentityResolver(
-                .init(accessKey: credentials.accessKeyId, secret: credentials.secretAccessKey)
-            ),
-            region: region
-        )
-        let client = BedrockRuntimeClient(config: config)
+        let client = BedrockRuntimeClient(config: configBuilder)
 
         // リージョンに応じた推論 ID を取得（Cross-Region inference 対応）
         let settingsModelId = AWSSettingsViewModel.currentBedrockModelId

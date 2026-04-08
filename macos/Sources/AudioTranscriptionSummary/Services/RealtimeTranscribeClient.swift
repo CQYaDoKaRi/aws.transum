@@ -4,6 +4,7 @@
 
 import Foundation
 import AWSTranscribeStreaming
+import SmithyIdentity
 
 // MARK: - RealtimeTranscribeClient
 
@@ -40,9 +41,21 @@ final class RealtimeTranscribeClient: @unchecked Sendable, RealtimeTranscribing 
         autoDetectLanguages: [String]? = ["ja-JP", "en-US"],
         region: String = "ap-northeast-1"
     ) async throws {
-        let config = try await TranscribeStreamingClient.TranscribeStreamingClientConfiguration(
-            region: region
-        )
+        // AWSClientFactory 経由で認証情報を解決
+        let resolver = try AWSClientFactory.makeCredentialResolver()
+
+        let config: TranscribeStreamingClient.TranscribeStreamingClientConfiguration
+        if let resolver = resolver {
+            config = try await TranscribeStreamingClient.TranscribeStreamingClientConfiguration(
+                awsCredentialIdentityResolver: resolver,
+                region: region
+            )
+        } else {
+            // SSO プロファイル等: SDK デフォルトの credential resolver を使用
+            config = try await TranscribeStreamingClient.TranscribeStreamingClientConfiguration(
+                region: region
+            )
+        }
         client = TranscribeStreamingClient(config: config)
 
         // 音声ストリームを作成

@@ -296,6 +296,29 @@ public sealed partial class MainPage : Page
                     break;
             }
         };
+
+        // 起動時に AWS 接続テスト → 失敗なら設定画面を開く
+        _ = TestConnectionOnStartupAsync();
+    }
+
+    private async Task TestConnectionOnStartupAsync()
+    {
+        try
+        {
+            var store = new SettingsStore();
+            var settings = store.Load();
+            if (string.IsNullOrWhiteSpace(settings.AccessKeyId))
+            {
+                OnSettingsClick(this, new RoutedEventArgs());
+                return;
+            }
+            var client = new TranscribeClient(store);
+            await client.TestConnectionAsync();
+        }
+        catch
+        {
+            OnSettingsClick(this, new RoutedEventArgs());
+        }
     }
 
     private void ScrollRealtimeToBottom()
@@ -508,8 +531,106 @@ public sealed partial class MainPage : Page
         var store = new SettingsStore();
         var settings = store.Load();
 
+        // 認証方式の状態管理
+        var currentAuthMethod = settings.AuthMethod == "awsProfile" ? "awsProfile" : "accessKey";
+
+        // --- 認証方式 RadioButtons ---
+        var authMethodRadio = new RadioButtons
+        {
+            Header = "認証方式",
+            Margin = new Thickness(0, 0, 0, 8)
+        };
+        var accessKeyRadioItem = new RadioButton { Content = "Access Key", Tag = "accessKey" };
+        var awsProfileRadioItem = new RadioButton { Content = "AWS Profile", Tag = "awsProfile" };
+        authMethodRadio.Items.Add(accessKeyRadioItem);
+        authMethodRadio.Items.Add(awsProfileRadioItem);
+        if (currentAuthMethod == "awsProfile")
+            awsProfileRadioItem.IsChecked = true;
+        else
+            accessKeyRadioItem.IsChecked = true;
+
+        // --- Access Key フィールド ---
         var accessKeyBox = new TextBox { Header = "Access Key ID", Text = settings.AccessKeyId, Margin = new Thickness(0, 0, 0, 8) };
         var secretKeyBox = new PasswordBox { Header = "Secret Access Key", Password = settings.SecretAccessKey, Margin = new Thickness(0, 0, 0, 8) };
+        var accessKeyPanel = new StackPanel { Margin = new Thickness(0, 0, 0, 0) };
+        accessKeyPanel.Children.Add(accessKeyBox);
+        accessKeyPanel.Children.Add(secretKeyBox);
+
+        // --- AWS Profile フィールド ---
+        var profileCombo = new ComboBox { Header = "プロファイル", HorizontalAlignment = HorizontalAlignment.Stretch, Margin = new Thickness(0, 0, 0, 0) };
+        var profileRefreshBtn = new Button { Content = "🔄", VerticalAlignment = VerticalAlignment.Bottom, Margin = new Thickness(4, 0, 0, 0) };
+        var profileGrid = new Grid { Margin = new Thickness(0, 0, 0, 8) };
+        profileGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+        profileGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+        Grid.SetColumn(profileCombo, 0);
+        Grid.SetColumn(profileRefreshBtn, 1);
+        profileGrid.Children.Add(profileCombo);
+        profileGrid.Children.Add(profileRefreshBtn);
+
+        var profileErrorText = new TextBlock
+        {
+            Foreground = new Microsoft.UI.Xaml.Media.SolidColorBrush(Microsoft.UI.Colors.Orange),
+            FontSize = 12,
+            TextWrapping = TextWrapping.Wrap,
+            Margin = new Thickness(0, 0, 0, 8),
+            Visibility = Visibility.Collapsed
+        };
+
+        var awsProfilePanel = new StackPanel { Margin = new Thickness(0, 0, 0, 0) };
+        awsProfilePanel.Children.Add(profileGrid);
+        awsProfilePanel.Children.Add(profileErrorText);
+
+        // プロファイル一覧を読み込むヘルパー
+        void LoadProfiles()
+        {
+            profileCombo.Items.Clear();
+            profileErrorText.Visibility = Visibility.Collapsed;
+
+            var configPath = AWSConfigParser.DefaultConfigPath;
+            if (!System.IO.File.Exists(configPath))
+            {
+                profileErrorText.Text = "AWS CLI の設定ファイルが見つかりません（~/.aws/config）";
+                profileErrorText.Visibility = Visibility.Visible;
+                return;
+            }
+
+            var profiles = AWSConfigParser.LoadProfileNames();
+            if (profiles.Count == 0)
+            {
+                profileErrorText.Text = "プロファイルが見つかりません";
+                profileErrorText.Visibility = Visibility.Visible;
+                return;
+            }
+
+            foreach (var p in profiles)
+                profileCombo.Items.Add(p);
+
+            // 保存済みプロファイルを選択
+            var savedProfile = settings.AwsProfileName;
+            var idx = profiles.IndexOf(savedProfile);
+            profileCombo.SelectedIndex = idx >= 0 ? idx : 0;
+        }
+
+        // 認証方式に応じた表示切り替え
+        void UpdateAuthMethodVisibility()
+        {
+            var isAccessKey = accessKeyRadioItem.IsChecked == true;
+            accessKeyPanel.Visibility = isAccessKey ? Visibility.Visible : Visibility.Collapsed;
+            awsProfilePanel.Visibility = isAccessKey ? Visibility.Collapsed : Visibility.Visible;
+
+            if (!isAccessKey)
+                LoadProfiles();
+        }
+
+        // RadioButton 変更イベント
+        accessKeyRadioItem.Checked += (_, _) => UpdateAuthMethodVisibility();
+        awsProfileRadioItem.Checked += (_, _) => UpdateAuthMethodVisibility();
+
+        // リフレッシュボタン
+        profileRefreshBtn.Click += (_, _) => LoadProfiles();
+
+        // 初期表示
+        UpdateAuthMethodVisibility();
 
         var regionCombo = new ComboBox { Header = "リージョン", Margin = new Thickness(0, 0, 0, 8), HorizontalAlignment = HorizontalAlignment.Stretch };
         var regions = new[] { "ap-northeast-1", "ap-northeast-2", "ap-southeast-1", "ap-southeast-2",
@@ -562,15 +683,13 @@ public sealed partial class MainPage : Page
         // Connection test UI
         var connectionStatusText = new TextBlock
         {
-            Text = string.IsNullOrWhiteSpace(settings.AccessKeyId) ? "未設定" : "未検証",
+            Text = "未検証",
             Margin = new Thickness(8, 0, 0, 0),
             VerticalAlignment = VerticalAlignment.Center
         };
         var connectionStatusBadge = new Border
         {
-            Background = string.IsNullOrWhiteSpace(settings.AccessKeyId)
-                ? new Microsoft.UI.Xaml.Media.SolidColorBrush(Microsoft.UI.Colors.Gray)
-                : new Microsoft.UI.Xaml.Media.SolidColorBrush(Microsoft.UI.Colors.Goldenrod),
+            Background = new Microsoft.UI.Xaml.Media.SolidColorBrush(Microsoft.UI.Colors.Goldenrod),
             CornerRadius = new CornerRadius(4),
             Padding = new Thickness(8, 2, 8, 2),
             Child = connectionStatusText,
@@ -595,10 +714,14 @@ public sealed partial class MainPage : Page
 
             try
             {
+                // 認証方式に応じてテスト用設定を構築
+                var isAccessKeyMode = accessKeyRadioItem.IsChecked == true;
                 var testSettings = new AppSettings
                 {
+                    AuthMethod = isAccessKeyMode ? "accessKey" : "awsProfile",
                     AccessKeyId = accessKeyBox.Text,
                     SecretAccessKey = secretKeyBox.Password,
+                    AwsProfileName = profileCombo.SelectedItem?.ToString() ?? "",
                     Region = regionCombo.SelectedItem?.ToString() ?? "ap-northeast-1",
                     S3BucketName = s3Bucket.Text
                 };
@@ -639,8 +762,9 @@ public sealed partial class MainPage : Page
 
         // グループ: AWS認証情報
         panel.Children.Add(CreateGroupLabel("🔑 AWS 認証情報"));
-        panel.Children.Add(accessKeyBox);
-        panel.Children.Add(secretKeyBox);
+        panel.Children.Add(authMethodRadio);
+        panel.Children.Add(accessKeyPanel);
+        panel.Children.Add(awsProfilePanel);
         panel.Children.Add(regionCombo);
         panel.Children.Add(s3Bucket);
         panel.Children.Add(connectionPanel);
@@ -666,6 +790,9 @@ public sealed partial class MainPage : Page
         var result = await dialog.ShowAsync();
         if (result == ContentDialogResult.Primary)
         {
+            // 認証方式と関連設定を保存
+            settings.AuthMethod = accessKeyRadioItem.IsChecked == true ? "accessKey" : "awsProfile";
+            settings.AwsProfileName = profileCombo.SelectedItem?.ToString() ?? "";
             settings.AccessKeyId = accessKeyBox.Text;
             settings.SecretAccessKey = secretKeyBox.Password;
             settings.Region = regionCombo.SelectedItem?.ToString() ?? "ap-northeast-1";
@@ -682,6 +809,7 @@ public sealed partial class MainPage : Page
             InitializeBedrockModelCombo(settings);
         }
     }
+
 
     private static IntPtr GetWindowHandle()
     {

@@ -43,10 +43,14 @@ public class RealtimeTranscribeClient : IDisposable
     public async Task StartStreamingAsync(string language, bool autoDetect)
     {
         var settings = _settingsStore.Load();
-        if (string.IsNullOrWhiteSpace(settings.AccessKeyId) ||
-            string.IsNullOrWhiteSpace(settings.SecretAccessKey))
+        AWSCredentials credentials;
+        try
         {
-            ErrorOccurred?.Invoke(this, "AWS認証情報が設定されていません");
+            credentials = AWSClientFactory.MakeCredentials(_settingsStore);
+        }
+        catch (AppError ex)
+        {
+            ErrorOccurred?.Invoke(this, ex.Message);
             return;
         }
 
@@ -55,16 +59,17 @@ public class RealtimeTranscribeClient : IDisposable
         _reconnectCount = 0;
         _cts = new CancellationTokenSource();
 
-        await StartStreamingInternalAsync(settings);
+        await StartStreamingInternalAsync(settings, credentials);
     }
 
-    private Task StartStreamingInternalAsync(AppSettings settings)
+    private Task StartStreamingInternalAsync(AppSettings settings, AWSCredentials? credentials = null)
     {
         try
         {
-            var credentials = new BasicAWSCredentials(settings.AccessKeyId, settings.SecretAccessKey);
-            _client = new AmazonTranscribeStreamingClient(credentials,
-                RegionEndpoint.GetBySystemName(settings.Region));
+            // 認証情報が渡されなかった場合は AWSClientFactory から取得
+            credentials ??= AWSClientFactory.MakeCredentials(_settingsStore);
+            var region = AWSClientFactory.ResolveRegionEndpoint(_settingsStore);
+            _client = new AmazonTranscribeStreamingClient(credentials, region);
 
             var request = new StartStreamTranscriptionRequest
             {

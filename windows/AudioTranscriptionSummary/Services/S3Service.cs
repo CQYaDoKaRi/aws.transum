@@ -14,6 +14,17 @@ public class S3Service
 {
     private readonly AmazonS3Client _client;
 
+    /// <summary>
+    /// AWSCredentials と RegionEndpoint を受け取るコンストラクタ（AWSClientFactory 経由用）
+    /// </summary>
+    public S3Service(AWSCredentials credentials, RegionEndpoint region)
+    {
+        _client = new AmazonS3Client(credentials, region);
+    }
+
+    /// <summary>
+    /// Access Key / Secret Key / Region 文字列を受け取るコンストラクタ（後方互換性用）
+    /// </summary>
     public S3Service(string accessKeyId, string secretAccessKey, string region)
     {
         var credentials = new BasicAWSCredentials(accessKeyId, secretAccessKey);

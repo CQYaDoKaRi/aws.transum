@@ -39,4 +39,12 @@ public class AppSettings
 
     [JsonPropertyName("splitIntervalMinutes")]
     public int SplitIntervalMinutes { get; set; } = 30;
+
+    /// <summary>認証方式（"accessKey" または "awsProfile"）</summary>
+    [JsonPropertyName("authMethod")]
+    public string AuthMethod { get; set; } = "accessKey";
+
+    /// <summary>選択された AWS プロファイル名</summary>
+    [JsonPropertyName("awsProfileName")]
+    public string AwsProfileName { get; set; } = "";
 }

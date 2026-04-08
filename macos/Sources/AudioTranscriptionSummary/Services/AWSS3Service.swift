@@ -35,6 +35,29 @@ final class AWSS3Service: S3ClientProtocol, Sendable {
         self.s3Client = S3Client(config: config)
     }
 
+    /// AWSClientFactory 経由で S3 クライアントを初期化する
+    /// 認証方式（accessKey / awsProfile）に応じた credential resolver を自動選択する
+    /// - Parameter region: AWS リージョン（nil の場合は AWSClientFactory.currentRegion() を使用）
+    /// - Throws: 認証情報の解決または S3 クライアントの初期化に失敗した場合
+    init(region: String? = nil) throws {
+        let resolvedRegion = region ?? AWSClientFactory.currentRegion()
+        let resolver = try AWSClientFactory.makeCredentialResolver()
+
+        let config: S3Client.S3ClientConfig
+        if let resolver = resolver {
+            config = try S3Client.S3ClientConfig(
+                awsCredentialIdentityResolver: resolver,
+                region: resolvedRegion
+            )
+        } else {
+            // SSO プロファイル等: SDK デフォルトの credential resolver を使用
+            config = try S3Client.S3ClientConfig(
+                region: resolvedRegion
+            )
+        }
+        self.s3Client = S3Client(config: config)
+    }
+
     // MARK: - S3ClientProtocol 準拠
 
     /// S3 バケットにファイルをアップロードする

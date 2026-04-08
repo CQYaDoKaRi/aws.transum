@@ -218,6 +218,17 @@
 1. WHEN 同じアプリケーションが既に起動中の場合、THE App SHALL 新しいインスタンスを起動せずに終了する
 2. THE App SHALL macOS では NSRunningApplication、Windows では Mutex を使用して二重起動を検出する
 
+### 要件 18: 起動時 AWS 接続テスト（Startup Connection Test）
+
+**ユーザーストーリー:** ユーザーとして、起動時に AWS 環境への接続が自動的にテストされ、問題があれば設定画面が開いてほしい。それにより、接続問題に素早く気づいて対処できるようにしたい。
+
+#### 受け入れ基準（Acceptance Criteria）
+
+1. WHEN App が起動した場合、THE App SHALL AWS 環境への接続テストを自動実行する
+2. IF 接続テストが失敗した場合、THEN THE App SHALL 設定画面を自動的に開く
+3. IF AWS 認証情報が未設定の場合、THEN THE App SHALL 設定画面を自動的に開く
+4. THE App SHALL 設定画面の下部にステータスバーを表示し、接続ステータス（接続済み/エラー/未検証/未設定）とエラーメッセージを表示する
+
 ### 要件 12: アプリアイコン（Application Icon）
 
 **ユーザーストーリー:** ユーザーとして、Dock やアプリケーション一覧でアプリを視覚的に識別したい。それにより、他のアプリケーションと区別しやすくしたい。

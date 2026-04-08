@@ -37,6 +37,17 @@ class AWSSettingsViewModel: ObservableObject {
     @Published var defaultTargetLanguage: TranslationLanguage = .japanese
     @Published var bedrockModelId: String = "anthropic.claude-3-haiku-20240307-v1:0"
 
+    // MARK: - Published プロパティ（認証方式）
+
+    /// 現在の認証方式
+    @Published var authMethod: AuthMethod = .accessKey
+    /// 選択された AWS プロファイル名
+    @Published var selectedProfileName: String = ""
+    /// 利用可能なプロファイル一覧
+    @Published var availableProfiles: [String] = []
+    /// プロファイル読み込みエラー
+    @Published var profileLoadError: String?
+
     // MARK: - 設定ファイルストア
 
     nonisolated(unsafe) private static let settingsStore = AppSettingsStore()
@@ -76,14 +87,37 @@ class AWSSettingsViewModel: ObservableObject {
     }
 
     /// JSON から AWS 認証情報を読み込む（アプリ起動時の DI 用）
+    /// authMethod に応じて Access Key またはプロファイルから認証情報を解決する
     nonisolated static func loadAWSCredentials() -> AWSCredentials? {
         let settings = AppSettingsStore().load()
-        let creds = AWSCredentials(
-            accessKeyId: settings.accessKeyId,
-            secretAccessKey: settings.secretAccessKey,
-            region: settings.region
-        )
-        return creds.isValid ? creds : nil
+        let authMethod = AuthMethod(rawValue: settings.authMethod) ?? .accessKey
+
+        switch authMethod {
+        case .accessKey:
+            let creds = AWSCredentials(
+                accessKeyId: settings.accessKeyId,
+                secretAccessKey: settings.secretAccessKey,
+                region: settings.region
+            )
+            return creds.isValid ? creds : nil
+
+        case .awsProfile:
+            let profileName = settings.awsProfileName.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !profileName.isEmpty else { return nil }
+            do {
+                let resolved = try AWSProfileCredentialHelper.resolveCredentials(profileName: profileName)
+                let region = resolved.region ?? settings.region
+                return AWSCredentials(
+                    accessKeyId: resolved.accessKey,
+                    secretAccessKey: resolved.secretKey,
+                    region: region
+                )
+            } catch {
+                // SSO プロファイル等: 静的キーがない場合は nil を返す
+                // AWS_PROFILE 環境変数は resolveCredentials 内で設定済み
+                return nil
+            }
+        }
     }
 
     /// JSON から S3 バケット名を読み込む
@@ -91,10 +125,17 @@ class AWSSettingsViewModel: ObservableObject {
         AppSettingsStore().load().s3BucketName
     }
 
-    /// AWS 認証情報が有効かどうか
+    /// AWS 認証情報が有効かどうか（authMethod に応じて判定）
     nonisolated static var hasValidCredentials: Bool {
         let settings = AppSettingsStore().load()
-        return !settings.accessKeyId.isEmpty && !settings.secretAccessKey.isEmpty
+        let authMethod = AuthMethod(rawValue: settings.authMethod) ?? .accessKey
+
+        switch authMethod {
+        case .accessKey:
+            return !settings.accessKeyId.isEmpty && !settings.secretAccessKey.isEmpty
+        case .awsProfile:
+            return !settings.awsProfileName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        }
     }
 
     /// AWS リージョン（static アクセス用）
@@ -143,11 +184,45 @@ class AWSSettingsViewModel: ObservableObject {
             self?.saveToFile()
             // isSaved を更新
             if let self = self {
-                self.isSaved = !self.accessKeyId.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-                    && !self.secretAccessKey.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+                self.updateSavedState()
             }
         }
         .store(in: &cancellables)
+
+        // authMethod 変更時の処理
+        $authMethod
+            .dropFirst() // 初期値の発火をスキップ
+            .sink { [weak self] newMethod in
+                guard let self = self else { return }
+                self.saveToFile()
+                self.updateSavedState()
+                // awsProfile に切り替わった時にプロファイル一覧を自動読み込み
+                if newMethod == .awsProfile {
+                    self.loadProfiles()
+                }
+            }
+            .store(in: &cancellables)
+
+        // selectedProfileName 変更時の処理
+        $selectedProfileName
+            .dropFirst() // 初期値の発火をスキップ
+            .sink { [weak self] _ in
+                guard let self = self else { return }
+                self.saveToFile()
+                self.updateSavedState()
+            }
+            .store(in: &cancellables)
+    }
+
+    /// isSaved 状態を更新する
+    private func updateSavedState() {
+        switch authMethod {
+        case .accessKey:
+            isSaved = !accessKeyId.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+                && !secretAccessKey.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        case .awsProfile:
+            isSaved = !selectedProfileName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        }
     }
 
     // MARK: - 読み込み
@@ -164,7 +239,23 @@ class AWSSettingsViewModel: ObservableObject {
         isAutoDetectEnabled = settings.isAutoDetectEnabled
         defaultTargetLanguage = TranslationLanguage(rawValue: settings.defaultTargetLanguage) ?? .japanese
         bedrockModelId = settings.bedrockModelId
-        isSaved = !settings.accessKeyId.isEmpty && !settings.secretAccessKey.isEmpty
+
+        // 認証方式の復元
+        authMethod = AuthMethod(rawValue: settings.authMethod) ?? .accessKey
+        selectedProfileName = settings.awsProfileName
+
+        // isSaved の初期状態を authMethod に応じて設定
+        switch authMethod {
+        case .accessKey:
+            isSaved = !settings.accessKeyId.isEmpty && !settings.secretAccessKey.isEmpty
+        case .awsProfile:
+            isSaved = !settings.awsProfileName.isEmpty
+        }
+
+        // awsProfile の場合はプロファイル一覧を読み込み
+        if authMethod == .awsProfile {
+            loadProfiles()
+        }
 
         // 保存済みモデルがリージョンで利用不可、またはモデルリストに存在しない場合は自動切り替え
         let models = BedrockModel.availableModels(for: region)
@@ -182,7 +273,7 @@ class AWSSettingsViewModel: ObservableObject {
     // MARK: - JSON ファイルへの保存
 
     private func saveToFile() {
-        let settings = AppSettings(
+        var settings = AppSettings(
             accessKeyId: accessKeyId.trimmingCharacters(in: .whitespacesAndNewlines),
             secretAccessKey: secretAccessKey.trimmingCharacters(in: .whitespacesAndNewlines),
             region: region.trimmingCharacters(in: .whitespacesAndNewlines),
@@ -194,6 +285,8 @@ class AWSSettingsViewModel: ObservableObject {
             defaultTargetLanguage: defaultTargetLanguage.rawValue,
             bedrockModelId: bedrockModelId
         )
+        settings.authMethod = authMethod.rawValue
+        settings.awsProfileName = selectedProfileName
         do {
             try Self.settingsStore.save(settings)
         } catch {
@@ -283,6 +376,37 @@ class AWSSettingsViewModel: ObservableObject {
         saveToFile()
     }
 
+    // MARK: - プロファイル管理
+
+    /// ~/.aws/config からプロファイル一覧を読み込む
+    func loadProfiles() {
+        profileLoadError = nil
+        let configPath = AWSConfigParser.defaultConfigPath
+
+        guard FileManager.default.fileExists(atPath: configPath) else {
+            profileLoadError = "AWS CLI の設定ファイルが見つかりません"
+            availableProfiles = []
+            return
+        }
+
+        let profiles = AWSConfigParser.loadProfileNames(from: configPath)
+        if profiles.isEmpty {
+            profileLoadError = "プロファイルが見つかりません"
+            availableProfiles = []
+        } else {
+            availableProfiles = profiles
+            // 選択中のプロファイルが一覧にない場合は先頭を選択
+            if !profiles.contains(selectedProfileName) && !profiles.isEmpty {
+                selectedProfileName = profiles[0]
+            }
+        }
+    }
+
+    /// プロファイル一覧をリフレッシュする（リフレッシュボタン用）
+    func refreshProfiles() {
+        loadProfiles()
+    }
+
     // MARK: - AWS 接続テスト
 
     func testConnection() async {
@@ -291,6 +415,21 @@ class AWSSettingsViewModel: ObservableObject {
         isTesting = true
         defer { isTesting = false }
 
+        let bucket = s3BucketName.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !bucket.isEmpty else {
+            connectionTestResult = "S3 バケット名を入力してください。"; return
+        }
+
+        switch authMethod {
+        case .accessKey:
+            await testConnectionWithAccessKey(bucket: bucket)
+        case .awsProfile:
+            await testConnectionWithProfile(bucket: bucket)
+        }
+    }
+
+    /// Access Key 方式の接続テスト
+    private func testConnectionWithAccessKey(bucket: String) async {
         let creds = AWSCredentials(
             accessKeyId: accessKeyId.trimmingCharacters(in: .whitespacesAndNewlines),
             secretAccessKey: secretAccessKey.trimmingCharacters(in: .whitespacesAndNewlines),
@@ -299,33 +438,60 @@ class AWSSettingsViewModel: ObservableObject {
         guard creds.isValid else {
             connectionTestResult = "認証情報を保存してください。"; return
         }
-        let bucket = s3BucketName.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !bucket.isEmpty else {
-            connectionTestResult = "S3 バケット名を入力してください。"; return
-        }
 
         do {
             let s3 = try AWSS3Service(credentials: creds)
-            let key = ".connection-test-\(UUID().uuidString)"
-            let tmp = FileManager.default.temporaryDirectory.appendingPathComponent(key)
-            try "test".data(using: .utf8)!.write(to: tmp)
-            defer { try? FileManager.default.removeItem(at: tmp) }
-            try await s3.putObject(bucket: bucket, key: key, fileURL: tmp)
-            try await s3.deleteObject(bucket: bucket, key: key)
-            connectionTestSuccess = true
-            connectionTestResult = "接続成功: 認証情報と S3 バケットが正常に確認されました。"
+            try await performS3ConnectionTest(s3: s3, bucket: bucket)
         } catch {
-            connectionTestSuccess = false
+            handleConnectionTestError(error, bucket: bucket)
+        }
+    }
+
+    /// AWS Profile 方式の接続テスト
+    private func testConnectionWithProfile(bucket: String) async {
+        guard !selectedProfileName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+            connectionTestResult = "プロファイルを選択してください。"; return
+        }
+
+        do {
+            let s3 = try AWSS3Service()
+            try await performS3ConnectionTest(s3: s3, bucket: bucket)
+        } catch {
+            // プロファイル認証失敗時の特別なメッセージ
             let d = error.localizedDescription.lowercased()
-            if d.contains("access denied") || d.contains("forbidden") {
-                connectionTestResult = "接続失敗: S3 バケットへのアクセス権限がありません。IAM ポリシーを確認してください。"
-            } else if d.contains("no such bucket") || d.contains("nosuchbucket") {
-                connectionTestResult = "接続失敗: S3 バケット「\(bucket)」が見つかりません。"
-            } else if (error as NSError).domain == NSURLErrorDomain {
-                connectionTestResult = "接続失敗: ネットワーク接続を確認してください。"
+            if d.contains("expired") || d.contains("invalid") || d.contains("credential") {
+                connectionTestResult = "接続失敗: 認証情報が無効です。`aws sso login --profile \(selectedProfileName)` を実行してください。"
+                connectionTestSuccess = false
             } else {
-                connectionTestResult = "接続失敗: \(error.localizedDescription)"
+                handleConnectionTestError(error, bucket: bucket)
             }
+        }
+    }
+
+    /// S3 接続テストの共通処理
+    private func performS3ConnectionTest(s3: AWSS3Service, bucket: String) async throws {
+        let key = ".connection-test-\(UUID().uuidString)"
+        let tmp = FileManager.default.temporaryDirectory.appendingPathComponent(key)
+        try "test".data(using: .utf8)!.write(to: tmp)
+        defer { try? FileManager.default.removeItem(at: tmp) }
+        try await s3.putObject(bucket: bucket, key: key, fileURL: tmp)
+        try await s3.deleteObject(bucket: bucket, key: key)
+        connectionTestSuccess = true
+        connectionTestResult = "接続成功: 認証情報と S3 バケットが正常に確認されました。"
+    }
+
+    /// 接続テストエラーの共通ハンドリング
+    private func handleConnectionTestError(_ error: Error, bucket: String) {
+        connectionTestSuccess = false
+        let d = error.localizedDescription.lowercased()
+        if d.contains("access denied") || d.contains("forbidden") {
+            connectionTestResult = "接続失敗: S3 バケットへのアクセス権限がありません。IAM ポリシーを確認してください。"
+        } else if d.contains("no such bucket") || d.contains("nosuchbucket") {
+            connectionTestResult = "接続失敗: S3 バケット「\(bucket)」が見つかりません。"
+        } else if (error as NSError).domain == NSURLErrorDomain {
+            connectionTestResult = "接続失敗: ネットワーク接続を確認してください。"
+        } else {
+            connectionTestResult = "接続失敗: \(error.localizedDescription)"
         }
     }
 }

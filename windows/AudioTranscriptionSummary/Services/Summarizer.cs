@@ -34,8 +34,11 @@ public class Summarizer
 
         var settings = _settingsStore.Load();
 
-        // Bedrock で要約を試みる
-        if (!string.IsNullOrEmpty(settings.AccessKeyId) && !string.IsNullOrEmpty(settings.SecretAccessKey))
+        // Bedrock で要約を試みる（Access Key 方式またはプロファイル方式で認証情報がある場合）
+        var hasCredentials = settings.AuthMethod == "awsProfile"
+            ? !string.IsNullOrEmpty(settings.AwsProfileName)
+            : (!string.IsNullOrEmpty(settings.AccessKeyId) && !string.IsNullOrEmpty(settings.SecretAccessKey));
+        if (hasCredentials)
         {
             try
             {
@@ -77,19 +80,19 @@ public class Summarizer
 
     private async Task<string> SummarizeWithBedrockAsync(string text, string additionalPrompt, AppSettings settings)
     {
-        var client = new AmazonBedrockRuntimeClient(
-            settings.AccessKeyId,
-            settings.SecretAccessKey,
-            Amazon.RegionEndpoint.GetBySystemName(settings.Region)
-        );
+        // AWSClientFactory 経由で認証情報とリージョンを解決
+        var credentials = AWSClientFactory.MakeCredentials(_settingsStore);
+        var region = AWSClientFactory.ResolveRegionEndpoint(_settingsStore);
+        var client = new AmazonBedrockRuntimeClient(credentials, region);
 
         var modelId = string.IsNullOrEmpty(settings.BedrockModelId)
             ? BedrockModel.DefaultModelId
             : settings.BedrockModelId;
 
         // Cross-Region inference profile IDを使用（on-demand throughput対応）
+        var resolvedRegion = AWSClientFactory.ResolveRegion(_settingsStore);
         var model = BedrockModel.Find(modelId);
-        var inferenceId = model?.GetInferenceId(settings.Region) ?? modelId;
+        var inferenceId = model?.GetInferenceId(resolvedRegion) ?? modelId;
 
         var prompt = "以下のテキストを簡潔に要約してください。要約は元のテキストの言語で出力してください。箇条書きではなく、自然な文章で要約してください。";
         if (!string.IsNullOrWhiteSpace(additionalPrompt))

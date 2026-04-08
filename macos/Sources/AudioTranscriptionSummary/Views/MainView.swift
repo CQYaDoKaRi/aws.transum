@@ -43,6 +43,15 @@ struct MainView: View {
         .frame(minWidth: 900, minHeight: 700)
         .toolbar { toolbarContent }
         .sheet(isPresented: $showSettings) { AWSSettingsView(viewModel: awsSettingsViewModel) }
+        .onAppear {
+            // 起動時に AWS 接続テスト → 失敗なら設定画面を開く
+            Task {
+                await awsSettingsViewModel.testConnection()
+                if !awsSettingsViewModel.connectionTestSuccess {
+                    showSettings = true
+                }
+            }
+        }
         .alert("エラー", isPresented: showErrorAlert) {
             if isRetryable {
                 Button("再試行") { Task { await viewModel.retry() } }

@@ -35,16 +35,10 @@ public class TranslateService
             return "";
 
         var settings = _settingsStore.Load();
-        if (string.IsNullOrWhiteSpace(settings.AccessKeyId) ||
-            string.IsNullOrWhiteSpace(settings.SecretAccessKey))
-        {
-            throw new AppError(AppErrorType.CredentialsNotSet,
-                "AWS認証情報が設定されていません");
-        }
-
-        var credentials = new BasicAWSCredentials(settings.AccessKeyId, settings.SecretAccessKey);
-        using var client = new AmazonTranslateClient(credentials,
-            RegionEndpoint.GetBySystemName(settings.Region));
+        // AWSClientFactory 経由で認証情報とリージョンを解決
+        var credentials = AWSClientFactory.MakeCredentials(_settingsStore);
+        var region = AWSClientFactory.ResolveRegionEndpoint(_settingsStore);
+        using var client = new AmazonTranslateClient(credentials, region);
 
         // UTF-8バイト数が制限内ならそのまま翻訳
         if (System.Text.Encoding.UTF8.GetByteCount(text) <= MaxBytesPerRequest)

@@ -36,4 +36,7 @@ public class AppSettings
 
     [JsonPropertyName("summaryAdditionalPrompt")]
     public string SummaryAdditionalPrompt { get; set; } = "";
+
+    [JsonPropertyName("splitIntervalMinutes")]
+    public int SplitIntervalMinutes { get; set; } = 30;
 }

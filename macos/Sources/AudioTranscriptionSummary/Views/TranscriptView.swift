@@ -30,12 +30,19 @@ struct TranscriptView: View {
                 // 文字起こし + 要約 統合ボタン
                 Button {
                     Task {
-                        await viewModel.transcribeAndSummarize(language: selectedLanguage)
+                        // fileList に選択ファイルがある場合は複数ファイル文字起こし
+                        let hasSelectedFiles = viewModel.fileList.contains { $0.isSelected }
+                        if hasSelectedFiles {
+                            await viewModel.transcribeMultipleFiles(language: selectedLanguage)
+                        } else {
+                            // fileList が空で audioFile がある場合は既存の単一ファイル処理
+                            await viewModel.transcribeAndSummarize(language: selectedLanguage)
+                        }
                     }
                 } label: {
                     Label("文字起こし＋要約", systemImage: "waveform.and.doc")
                 }
-                .disabled(viewModel.audioFile == nil || isProcessing)
+                .disabled((viewModel.audioFile == nil && !viewModel.fileList.contains { $0.isSelected }) || isProcessing)
             }
             .padding(.horizontal, 8)
             .padding(.top, 8)

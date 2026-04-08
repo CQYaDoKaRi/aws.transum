@@ -30,6 +30,8 @@ struct AppSettings: Codable, Equatable {
     var bedrockModelId: String = "anthropic.claude-sonnet-4-6"
     /// 要約時の追加プロンプト
     var summaryAdditionalPrompt: String = ""
+    /// ファイル分割間隔（分）。1〜60、デフォルト30
+    var splitIntervalMinutes: Int = 30
 }
 
 // MARK: - AppSettingsStore（設定ファイル管理）

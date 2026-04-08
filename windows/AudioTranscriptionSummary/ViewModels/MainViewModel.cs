@@ -1,6 +1,8 @@
 #nullable enable
 using System;
 using System.Collections.Generic;
+using System.IO;
+using System.Linq;
 using System.Threading.Tasks;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
@@ -49,15 +51,42 @@ public partial class MainViewModel : ObservableObject
     [ObservableProperty] private AudioSourceInfo? _selectedSource;
     [ObservableProperty] private TranscriptionLanguage _selectedTranscriptionLanguage = TranscriptionLanguage.Auto;
 
+    // ファイルリスト（複数ファイル文字起こし用）
+    [ObservableProperty] private System.Collections.ObjectModel.ObservableCollection<FileListItem> _fileList = new();
+    [ObservableProperty] private bool _isAllSelected;
+
+    // 録音開始中/停止中フラグ（ボタン無効化用）
+    [ObservableProperty] private bool _isStartingCapture;
+    [ObservableProperty] private bool _isStoppingCapture;
+
+    /// ファイル分割間隔（分）。1〜60、デフォルト30分
+    [ObservableProperty] private int _splitIntervalMinutes = 30;
+
     // ステータスバー進捗表示
     [ObservableProperty] private string? _progressMessage;
     [ObservableProperty] private double _statusProgress;
     [ObservableProperty] private bool _isProgressIndeterminate;
 
+    // 波形データ（波形表示用）
+    [ObservableProperty] private float[] _waveformData = Array.Empty<float>();
+
     // Status monitor display
     [ObservableProperty] private string _appCpuDisplay = "アプリ 0%";
     [ObservableProperty] private string _systemCpuDisplay = "全体 0%";
     [ObservableProperty] private string _memoryDisplay = "0 MB / 0 GB (0%)";
+
+    /// <summary>処理中かどうか（文字起こし中 または 要約中）</summary>
+    public bool IsProcessing => IsTranscribing || IsSummarizing;
+
+    partial void OnIsTranscribingChanged(bool value)
+    {
+        OnPropertyChanged(nameof(IsProcessing));
+    }
+
+    partial void OnIsSummarizingChanged(bool value)
+    {
+        OnPropertyChanged(nameof(IsProcessing));
+    }
 
     // Realtime & Translation ViewModels
     public RealtimeTranscriptionViewModel RealtimeTranscriptionVM { get; }
@@ -103,6 +132,20 @@ public partial class MainViewModel : ObservableObject
             _dispatcherQueue.TryEnqueue(() => AudioLevel = level);
         };
 
+        // 分割ファイル確定時にファイルリストへ自動登録
+        _audioCaptureService.FileSplitCompleted += (_, filePath) =>
+        {
+            _dispatcherQueue.TryEnqueue(() =>
+            {
+                try
+                {
+                    var file = _fileImporter.Import(filePath);
+                    FileList.Add(new FileListItem(file, isSelected: true));
+                }
+                catch { /* 分割ファイル読み込み失敗は無視 */ }
+            });
+        };
+
         _audioPlayerService.PositionChanged += (_, pos) =>
         {
             _dispatcherQueue.TryEnqueue(() =>
@@ -117,6 +160,7 @@ public partial class MainViewModel : ObservableObject
         // 追加プロンプトを設定から復元
         var savedSettings = _settingsStore.Load();
         SummaryAdditionalPrompt = savedSettings.SummaryAdditionalPrompt;
+        SplitIntervalMinutes = savedSettings.SplitIntervalMinutes;
     }
 
     private void LoadAudioSources()
@@ -144,6 +188,8 @@ public partial class MainViewModel : ObservableObject
             OnPropertyChanged(nameof(AudioDuration));
             IsPlaying = false;
             PlaybackPosition = TimeSpan.Zero;
+            // 波形データを生成
+            WaveformData = WaveformDataProvider.LoadWaveformData(filePath);
         }
         catch (AppError ex)
         {
@@ -360,6 +406,9 @@ public partial class MainViewModel : ObservableObject
     {
         if (SelectedSource == null) return;
         ErrorMessage = null;
+        IsStartingCapture = true;
+        ProgressMessage = "録音開始中...";
+        IsProgressIndeterminate = true;
 
         // Task 6.1: Clear all text on recording start
         RealtimeTranscriptionVM.Reset();
@@ -369,6 +418,7 @@ public partial class MainViewModel : ObservableObject
         Transcript = null;
         Summary = null;
         AudioFile = null;
+        FileList.Clear();
 
         // リアルタイム文字起こしのストリーム出力パスを設定
         var captureSettings = _settingsStore.Load();
@@ -382,8 +432,9 @@ public partial class MainViewModel : ObservableObject
 
         try
         {
-            _audioCaptureService.StartCapture(SelectedSource);
+            _audioCaptureService.StartCapture(SelectedSource, SplitIntervalMinutes);
             IsCapturing = true;
+            IsStartingCapture = false;
             _captureStartTime = DateTime.Now;
             ProgressMessage = "音声をキャプチャ中... 00:00";
             IsProgressIndeterminate = true;
@@ -401,6 +452,8 @@ public partial class MainViewModel : ObservableObject
         }
         catch (Exception ex)
         {
+            IsStartingCapture = false;
+            ProgressMessage = null;
             ErrorMessage = $"録音開始エラー: {ex.Message}";
         }
     }
@@ -485,33 +538,43 @@ public partial class MainViewModel : ObservableObject
     private void StopCapture()
     {
         ErrorMessage = null;
+        IsStoppingCapture = true;
+        ProgressMessage = "録音停止中...";
+        IsProgressIndeterminate = true;
         try
         {
             // Stop realtime streaming first
             _audioCaptureService.DataAvailable -= OnAudioDataForStreaming;
             _realtimeClient?.StopStreaming();
 
-            var filePath = _audioCaptureService.StopCapture();
+            var filePaths = _audioCaptureService.StopCapture();
             IsCapturing = false;
+            IsStoppingCapture = false;
             _captureStartTime = null;
             ProgressMessage = null;
             AudioLevel = 0;
 
-            // Import the recorded file
-            AudioFile = _fileImporter.Import(filePath);
-            _audioPlayerService.Load(filePath);
-            OnPropertyChanged(nameof(AudioDuration));
-            IsPlaying = false;
-            PlaybackPosition = TimeSpan.Zero;
+            // fileList への追加は FileSplitCompleted イベントで実施済み
 
-            // Realtime result stays in RealtimeTranscriptionVM only.
-            // Transcript is set only by batch transcription (TranscribeAndSummarize).
+            // 最初のファイルをプレーヤーに読み込み
+            if (FileList.Count > 0)
+            {
+                var firstFile = FileList[0].AudioFile;
+                AudioFile = firstFile;
+                _audioPlayerService.Load(firstFile.FilePath);
+                OnPropertyChanged(nameof(AudioDuration));
+                IsPlaying = false;
+                PlaybackPosition = TimeSpan.Zero;
+                WaveformData = WaveformDataProvider.LoadWaveformData(firstFile.FilePath);
+            }
 
             CleanupRealtimeClient();
         }
         catch (Exception ex)
         {
             IsCapturing = false;
+            IsStoppingCapture = false;
+            ProgressMessage = null;
             ErrorMessage = $"録音停止エラー: {ex.Message}";
         }
     }
@@ -528,6 +591,211 @@ public partial class MainViewModel : ObservableObject
         _captureStartTime = null;
         ProgressMessage = null;
         AudioLevel = 0;
+    }
+
+    // MARK: - ファイルリスト操作
+
+    /// ファイルリストにファイルを追加する
+    /// FileImporter で各パスを読み込み、FileListItem として末尾に追加する
+    public void AddFilesToList(IEnumerable<string> filePaths)
+    {
+        var errors = new List<string>();
+        foreach (var filePath in filePaths)
+        {
+            try
+            {
+                var audioFile = _fileImporter.Import(filePath);
+                var item = new FileListItem(audioFile);
+                FileList.Add(item);
+            }
+            catch (Exception ex)
+            {
+                errors.Add($"{Path.GetFileName(filePath)}: {ex.Message}");
+            }
+        }
+        if (errors.Count > 0)
+        {
+            ErrorMessage = "一部のファイルを追加できませんでした:\n" + string.Join("\n", errors);
+        }
+        UpdateIsAllSelected();
+    }
+
+    /// ファイルリストの全選択/全解除をトグルする
+    public void ToggleSelectAll()
+    {
+        var hasAnySelected = FileList.Any(f => f.IsSelected);
+        foreach (var item in FileList)
+        {
+            item.IsSelected = !hasAnySelected;
+        }
+        UpdateIsAllSelected();
+    }
+
+    /// ファイルリストから選択中のファイルを削除する
+    public void RemoveSelectedFiles()
+    {
+        var toRemove = FileList.Where(f => f.IsSelected).ToList();
+        foreach (var item in toRemove)
+        {
+            FileList.Remove(item);
+        }
+        UpdateIsAllSelected();
+    }
+
+    /// IsAllSelected を更新する
+    public void UpdateIsAllSelected()
+    {
+        IsAllSelected = FileList.Count > 0 && FileList.All(f => f.IsSelected);
+    }
+
+    /// ファイルリストの行タップで再生ファイルを切り替える
+    public void SelectFileForPlayback(AudioFile file)
+    {
+        AudioFile = file;
+        try
+        {
+            _audioPlayerService.Load(file.FilePath);
+            OnPropertyChanged(nameof(AudioDuration));
+            IsPlaying = false;
+            PlaybackPosition = TimeSpan.Zero;
+            // 波形データを生成
+            WaveformData = WaveformDataProvider.LoadWaveformData(file.FilePath);
+        }
+        catch { /* プレーヤー読み込み失敗は無視 */ }
+    }
+
+    // MARK: - 複数ファイル一括文字起こし
+
+    /// ファイルリストで選択されたファイルを逐次文字起こしし、結果を結合する
+    [RelayCommand]
+    private async Task TranscribeMultipleFilesAsync()
+    {
+        var selectedFiles = FileList.Where(f => f.IsSelected).ToList();
+        if (selectedFiles.Count == 0) return;
+
+        // 状態をリセット
+        ErrorMessage = null;
+        _lastOperation = TranscribeMultipleFilesAsync;
+        IsTranscribing = true;
+        TranscriptionProgress = 0;
+        IsProgressIndeterminate = false;
+        Transcript = null;
+        Summary = null;
+        TranscriptTranslationVM.Reset();
+        SummaryTranslationVM.Reset();
+
+        var totalCount = (double)selectedFiles.Count;
+        var results = new List<string>();
+        var errors = new List<string>();
+
+        for (int index = 0; index < selectedFiles.Count; index++)
+        {
+            var item = selectedFiles[index];
+            var i = (double)index;
+
+            try
+            {
+                var progress = new Progress<double>(p =>
+                {
+                    _dispatcherQueue.TryEnqueue(() =>
+                    {
+                        // 全体進捗: (i + p) / N
+                        var overallProgress = (i + p) / totalCount;
+                        TranscriptionProgress = overallProgress * 100;
+                        StatusProgress = overallProgress * 100;
+                        ProgressMessage = $"文字起こし中... ({index + 1}/{selectedFiles.Count}) {overallProgress * 100:F0}%";
+                    });
+                });
+
+                var language = SelectedTranscriptionLanguage.ToCode();
+                var transcript = await _transcribeClient.TranscribeAsync(item.AudioFile, language, progress);
+                results.Add(transcript.Text);
+            }
+            catch (Exception ex)
+            {
+                errors.Add($"{item.AudioFile.FileName}: {ex.Message}");
+            }
+
+            // ファイル完了時の進捗更新
+            TranscriptionProgress = ((i + 1) / totalCount) * 100;
+            StatusProgress = TranscriptionProgress;
+        }
+
+        // エラーメッセージの記録
+        if (errors.Count > 0)
+        {
+            ErrorMessage = "一部のファイルで文字起こしに失敗しました:\n" + string.Join("\n", errors);
+        }
+
+        // 結果テキストをファイル順に結合して transcript にセット
+        if (results.Count > 0)
+        {
+            var combinedText = string.Join("\n", results);
+            var firstFile = selectedFiles[0].AudioFile;
+            Transcript = new Transcript(
+                Guid.NewGuid(),
+                firstFile.Id,
+                combinedText,
+                SelectedTranscriptionLanguage.ToCode(),
+                DateTime.Now);
+        }
+
+        TranscriptionProgress = 100;
+        IsTranscribing = false;
+
+        // 結合結果を .transcript.txt ファイルとして保存
+        if (Transcript != null)
+        {
+            try
+            {
+                var settings = _settingsStore.Load();
+                var dir = !string.IsNullOrEmpty(settings.ExportDirectoryPath)
+                    ? settings.ExportDirectoryPath
+                    : !string.IsNullOrEmpty(settings.RecordingDirectoryPath)
+                        ? settings.RecordingDirectoryPath
+                        : null;
+                if (dir != null)
+                {
+                    if (!Directory.Exists(dir))
+                        Directory.CreateDirectory(dir);
+                    var baseName = Path.GetFileNameWithoutExtension(selectedFiles[0].AudioFile.FileName);
+                    var transcriptPath = Path.Combine(dir, $"{baseName}.transcript.txt");
+                    await File.WriteAllTextAsync(transcriptPath, Transcript.Text, System.Text.Encoding.UTF8);
+                }
+            }
+            catch (Exception ex)
+            {
+                ErrorLogger.SaveErrorLog(ex, "文字起こしファイル保存失敗");
+            }
+        }
+
+        // 要約も自動実行する
+        if (Transcript != null)
+        {
+            IsSummarizing = true;
+            ProgressMessage = "要約を生成中...";
+            IsProgressIndeterminate = true;
+            StatusProgress = 0;
+            SaveAdditionalPrompt();
+            try
+            {
+                Summary = await _summarizer.SummarizeAsync(Transcript, SummaryAdditionalPrompt);
+            }
+            catch (AppError ex) when (ex.ErrorType == AppErrorType.InsufficientContent)
+            {
+                Summary = null;
+            }
+            catch (Exception ex)
+            {
+                ErrorMessage = (ErrorMessage != null ? ErrorMessage + "\n" : "") + $"要約に失敗しました: {ex.Message}";
+            }
+            IsSummarizing = false;
+
+            // 要約結果をファイルに保存
+            SaveSummaryToFile(selectedFiles[0].AudioFile.FileName);
+        }
+
+        ProgressMessage = null;
     }
 
     private void CleanupRealtimeClient()

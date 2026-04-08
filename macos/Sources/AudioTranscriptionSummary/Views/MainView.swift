@@ -56,6 +56,14 @@ struct MainView: View {
         .onChange(of: viewModel.isRecordingScreen) { _, v in handleCaptureChange(v) }
         .onChange(of: viewModel.transcript) { _, _ in transcriptTranslationVM.reset() }
         .onChange(of: viewModel.summary) { _, _ in summaryTranslationVM.reset() }
+        .onChange(of: viewModel.isTranscribing) { _, transcribing in
+            if transcribing {
+                withAnimation(.easeInOut(duration: 0.2)) {
+                    isInputExpanded = false
+                    isRealtimeExpanded = false
+                }
+            }
+        }
     }
 
     // MARK: - ツールバー（左から: 録音/停止 → キャンセル → エクスポート → 設定）
@@ -72,6 +80,7 @@ struct MainView: View {
                     }
                 } label: { Image(systemName: "stop.circle.fill").foregroundStyle(.red).font(.title3) }
                     .help("停止")
+                    .disabled(viewModel.isStoppingCapture)
             } else {
                 Button {
                     Task {
@@ -80,6 +89,7 @@ struct MainView: View {
                     }
                 } label: { Image(systemName: "mic.circle.fill").foregroundStyle(.red).font(.title3) }
                     .help(viewModel.selectedAudioSource.isScreenRecording ? "録画開始" : "録音開始")
+                    .disabled(viewModel.isStartingCapture || viewModel.isProcessing)
             }
         }
         // キャンセルボタン
@@ -92,12 +102,13 @@ struct MainView: View {
                     }
                 } label: { Image(systemName: "xmark.circle").font(.title3) }
                     .help("キャンセル")
+                    .disabled(viewModel.isStoppingCapture)
             }
         }
         // 設定（右端）
         ToolbarItem(placement: .primaryAction) {
             Button { showSettings = true } label: { Label("設定", systemImage: "gearshape") }
-                .disabled(isAnyCapturing)
+                .disabled(isAnyCapturing || viewModel.isProcessing)
         }
     }
 
@@ -109,14 +120,15 @@ struct MainView: View {
         VStack(spacing: 0) {
             collapsibleSection(title: "入力", icon: "square.and.arrow.down", isExpanded: $isInputExpanded) {
                 VStack(spacing: 8) {
-                    HStack {
-                        // 音源選択 Picker
+                    // 1行目: 音源選択（左）+ レベルメーター（右）
+                    HStack(spacing: 8) {
                         Picker("", selection: $viewModel.selectedAudioSource) {
                             ForEach(viewModel.availableAudioSources) { source in
                                 Label(source.displayName, systemImage: source.iconName).tag(source)
                             }
                         }
-                        .disabled(viewModel.isCapturingSystemAudio || viewModel.isRecordingScreen)
+                        .frame(width: 220)
+                        .disabled(viewModel.isCapturingSystemAudio || viewModel.isRecordingScreen || viewModel.isProcessing)
                         .onChange(of: viewModel.selectedAudioSource) { _, newSource in
                             if !newSource.isScreenRecording {
                                 Task { await viewModel.startLevelPreview() }
@@ -125,13 +137,41 @@ struct MainView: View {
                             }
                         }
 
-                        // リアルタイム文字起こしトグル（スイッチ左、ラベル右）
+                        if !viewModel.selectedAudioSource.isScreenRecording {
+                            levelGauge(level: (viewModel.isCapturingSystemAudio || viewModel.isRecordingScreen) ? viewModel.captureAudioLevel : viewModel.previewAudioLevel)
+                        }
+                    }
+
+                    // 2行目: ファイル分割時間
+                    HStack(spacing: 6) {
+                        Text("ファイル分割")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                        Picker("", selection: $viewModel.splitIntervalMinutes) {
+                            ForEach([1, 5, 10, 15, 20, 30, 45, 60], id: \.self) { min in
+                                Text("\(min)分").tag(min)
+                            }
+                        }
+                        .frame(width: 80)
+                        .disabled(viewModel.isCapturingSystemAudio || viewModel.isRecordingScreen)
+                        .onChange(of: viewModel.splitIntervalMinutes) { _, newVal in
+                            let store = AppSettingsStore()
+                            var s = store.load()
+                            s.splitIntervalMinutes = newVal
+                            try? store.save(s)
+                        }
+                        Spacer()
+                    }
+
+                    // 3行目: リアルタイム文字起こしトグル
+                    HStack(spacing: 6) {
                         Toggle(isOn: $awsSettingsViewModel.isRealtimeEnabled) {
                             EmptyView()
                         }
                         .toggleStyle(.switch)
                         .controlSize(.small)
                         .labelsHidden()
+                        .disabled(viewModel.isProcessing)
                         Text("リアルタイム文字起こし")
                             .font(.caption)
                             .onChange(of: awsSettingsViewModel.isRealtimeEnabled) { _, enabled in
@@ -142,7 +182,6 @@ struct MainView: View {
                                         isTranscriptExpanded = false
                                         isSummaryExpanded = false
                                     }
-                                    // 録音中なら文字起こし・翻訳を開始（ストリーム出力ファイルがあれば追記）
                                     if isAnyCapturing {
                                         Task {
                                             await realtimeVM.startStreaming()
@@ -155,7 +194,6 @@ struct MainView: View {
                                         isTranscriptExpanded = true
                                         isSummaryExpanded = true
                                     }
-                                    // ストリーミング停止、テキストクリア
                                     realtimeVM.stopStreaming()
                                     viewModel.setRealtimeAudioCallback(nil)
                                     realtimeVM.finalText = ""
@@ -165,11 +203,7 @@ struct MainView: View {
                                     realtimeTranslationVM.reset()
                                 }
                             }
-                    }
-
-                    // レベルメーター（画面録画以外）
-                    if !viewModel.selectedAudioSource.isScreenRecording {
-                        levelGauge(level: (viewModel.isCapturingSystemAudio || viewModel.isRecordingScreen) ? viewModel.captureAudioLevel : viewModel.previewAudioLevel)
+                        Spacer()
                     }
 
                     // 画面プレビュー（画面録画中のみ）
@@ -184,15 +218,10 @@ struct MainView: View {
                 }
                 .padding(4)
                 .background(RoundedRectangle(cornerRadius: 8).fill(Color(.controlBackgroundColor)))
+                .opacity(viewModel.isProcessing ? 0.5 : 1.0)
                 .task { await viewModel.refreshAudioSources() }
             } statusContent: {
-                if viewModel.isCapturingSystemAudio {
-                    Circle().fill(.red).frame(width: 6, height: 6)
-                    Text("録音中").font(.caption2).foregroundStyle(.red)
-                } else if viewModel.isRecordingScreen {
-                    Circle().fill(.red).frame(width: 6, height: 6)
-                    Text("録画中").font(.caption2).foregroundStyle(.red)
-                }
+                EmptyView()
             }
         }
         .background(Color(.windowBackgroundColor))
@@ -226,15 +255,28 @@ struct MainView: View {
                                 isInputExpanded = false
                                 isRealtimeExpanded = false
                             }
-                        }, isDisabled: isAnyCapturing).padding(.horizontal, 8).padding(.top, 4).padding(.bottom, 2)
-                        AudioPlayerView(viewModel: viewModel).padding(.horizontal, 8).padding(.vertical, 2)
+                        }, isDisabled: isAnyCapturing || viewModel.isProcessing).padding(.horizontal, 8).padding(.top, 4).padding(.bottom, 2)
+                        // ファイルリスト（ファイルがある場合のみ表示）
+                        if !viewModel.fileList.isEmpty {
+                            FileListView(viewModel: viewModel)
+                                .padding(.horizontal, 8)
+                                .padding(.vertical, 2)
+                                .disabled(isAnyCapturing || viewModel.isProcessing)
+                                .opacity(isAnyCapturing || viewModel.isProcessing ? 0.5 : 1.0)
+                        }
+                        AudioPlayerView(viewModel: viewModel)
+                            .padding(.horizontal, 8).padding(.vertical, 2)
+                            .disabled(isAnyCapturing || viewModel.isProcessing)
+                            .opacity(isAnyCapturing || viewModel.isProcessing ? 0.5 : 1.0)
                         Divider()
                         HStack(spacing: 0) {
                             TranscriptView(viewModel: viewModel).frame(maxWidth: .infinity, maxHeight: .infinity)
                             Divider()
                             TranslationPanel(sourceText: viewModel.transcript?.text ?? "", translationVM: transcriptTranslationVM).frame(maxWidth: .infinity, maxHeight: .infinity)
                         }
-                        .frame(minHeight: 100)
+                        .frame(minHeight: 200)
+                        .disabled(isAnyCapturing || viewModel.isProcessing)
+                        .opacity(isAnyCapturing || viewModel.isProcessing ? 0.5 : 1.0)
                     }
                 }
                 Divider()
@@ -251,7 +293,7 @@ struct MainView: View {
                                 }
                                 .pickerStyle(.menu)
                                 .frame(width: 200)
-                                .disabled(viewModel.isSummarizing)
+                                .disabled(viewModel.isSummarizing || viewModel.isProcessing)
                                 .onChange(of: awsSettingsViewModel.bedrockModelId) { _, _ in
                                     awsSettingsViewModel.saveBedrockModelSetting()
                                 }
@@ -283,14 +325,14 @@ struct MainView: View {
                                             .font(.caption).frame(maxWidth: .infinity)
                                     }
                                     .controlSize(.small)
-                                    .disabled(isAnyCapturing)
+                                    .disabled(isAnyCapturing || viewModel.isProcessing)
                                     Button {
                                         Task { await viewModel.resummarize() }
                                     } label: {
                                         Label("要約", systemImage: "text.magnifyingglass")
                                             .font(.caption).frame(maxWidth: .infinity)
                                     }
-                                    .disabled(viewModel.transcript == nil || viewModel.isSummarizing)
+                                    .disabled(viewModel.transcript == nil || viewModel.isSummarizing || viewModel.isProcessing)
                                     .controlSize(.small)
                                 }
                                 .frame(width: 110)

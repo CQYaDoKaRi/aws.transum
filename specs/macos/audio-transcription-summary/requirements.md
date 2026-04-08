@@ -183,6 +183,8 @@
 3. WHILE 録音/録画中の間、THE App SHALL 音声文字起こしセクションの「ファイルを選択」ボタンを無効にする
 4. WHILE 録音/録画中の間、THE App SHALL 要約セクションの「ファイルから要約」ボタンを無効にする
 5. WHILE 録音/録画中の間、THE StatusBarView SHALL 録音経過時間を「録音中 MM:SS」形式で表示する
+6. WHILE 録音/録画中の間、THE App SHALL 入力ソースの選択コントロールを無効にする
+7. WHILE 録音/録画中の間、THE App SHALL ファイル分割時間の選択コントロールを無効にする
 
 ### 要件 15: リアルタイム文字起こしの有効/無効切り替え（Realtime Transcription Toggle）
 

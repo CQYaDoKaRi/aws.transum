@@ -58,7 +58,7 @@ public class AudioCaptureService : IDisposable
         return devices;
     }
 
-    public void StartCapture(AudioSourceInfo source)
+    public void StartCapture(AudioSourceInfo source, int splitIntervalMinutes = 30)
     {
         if (IsCapturing)
             throw new InvalidOperationException("Capture is already in progress.");
@@ -73,7 +73,8 @@ public class AudioCaptureService : IDisposable
         var timestamp = DateTime.Now.ToString("yyyyMMdd_HHmmss");
 
         // SplitRecordingManager を初期化
-        _splitManager = new SplitRecordingManager(timestamp, recordingDir);
+        _splitManager = new SplitRecordingManager(timestamp, recordingDir,
+            splitInterval: TimeSpan.FromMinutes(splitIntervalMinutes));
 
         // 最初の分割ファイルパスを取得
         _outputPath = _splitManager.NextFilePath();

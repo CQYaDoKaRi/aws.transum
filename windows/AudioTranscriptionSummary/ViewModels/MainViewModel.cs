@@ -59,6 +59,9 @@ public partial class MainViewModel : ObservableObject
     [ObservableProperty] private bool _isStartingCapture;
     [ObservableProperty] private bool _isStoppingCapture;
 
+    /// ファイル分割間隔（分）。1〜60、デフォルト30分
+    [ObservableProperty] private int _splitIntervalMinutes = 30;
+
     // ステータスバー進捗表示
     [ObservableProperty] private string? _progressMessage;
     [ObservableProperty] private double _statusProgress;
@@ -428,7 +431,7 @@ public partial class MainViewModel : ObservableObject
 
         try
         {
-            _audioCaptureService.StartCapture(SelectedSource);
+            _audioCaptureService.StartCapture(SelectedSource, SplitIntervalMinutes);
             IsCapturing = true;
             IsStartingCapture = false;
             _captureStartTime = DateTime.Now;

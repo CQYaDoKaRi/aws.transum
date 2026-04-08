@@ -56,6 +56,14 @@ struct MainView: View {
         .onChange(of: viewModel.isRecordingScreen) { _, v in handleCaptureChange(v) }
         .onChange(of: viewModel.transcript) { _, _ in transcriptTranslationVM.reset() }
         .onChange(of: viewModel.summary) { _, _ in summaryTranslationVM.reset() }
+        .onChange(of: viewModel.isTranscribing) { _, transcribing in
+            if transcribing {
+                withAnimation(.easeInOut(duration: 0.2)) {
+                    isInputExpanded = false
+                    isRealtimeExpanded = false
+                }
+            }
+        }
     }
 
     // MARK: - ツールバー（左から: 録音/停止 → キャンセル → エクスポート → 設定）
@@ -112,13 +120,14 @@ struct MainView: View {
         VStack(spacing: 0) {
             collapsibleSection(title: "入力", icon: "square.and.arrow.down", isExpanded: $isInputExpanded) {
                 VStack(spacing: 8) {
-                    HStack {
-                        // 音源選択 Picker
+                    // 1行目: 音源選択（左）+ レベルメーター（右）
+                    HStack(spacing: 8) {
                         Picker("", selection: $viewModel.selectedAudioSource) {
                             ForEach(viewModel.availableAudioSources) { source in
                                 Label(source.displayName, systemImage: source.iconName).tag(source)
                             }
                         }
+                        .frame(width: 220)
                         .disabled(viewModel.isCapturingSystemAudio || viewModel.isRecordingScreen || viewModel.isProcessing)
                         .onChange(of: viewModel.selectedAudioSource) { _, newSource in
                             if !newSource.isScreenRecording {
@@ -128,7 +137,28 @@ struct MainView: View {
                             }
                         }
 
-                        // リアルタイム文字起こしトグル（スイッチ左、ラベル右）
+                        if !viewModel.selectedAudioSource.isScreenRecording {
+                            levelGauge(level: (viewModel.isCapturingSystemAudio || viewModel.isRecordingScreen) ? viewModel.captureAudioLevel : viewModel.previewAudioLevel)
+                        }
+                    }
+
+                    // 2行目: ファイル分割時間
+                    HStack(spacing: 6) {
+                        Text("ファイル分割")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                        Picker("", selection: $viewModel.splitIntervalMinutes) {
+                            ForEach([1, 5, 10, 15, 20, 30, 45, 60], id: \.self) { min in
+                                Text("\(min)分").tag(min)
+                            }
+                        }
+                        .frame(width: 80)
+                        .disabled(viewModel.isCapturingSystemAudio || viewModel.isRecordingScreen)
+                        Spacer()
+                    }
+
+                    // 3行目: リアルタイム文字起こしトグル
+                    HStack(spacing: 6) {
                         Toggle(isOn: $awsSettingsViewModel.isRealtimeEnabled) {
                             EmptyView()
                         }
@@ -146,7 +176,6 @@ struct MainView: View {
                                         isTranscriptExpanded = false
                                         isSummaryExpanded = false
                                     }
-                                    // 録音中なら文字起こし・翻訳を開始（ストリーム出力ファイルがあれば追記）
                                     if isAnyCapturing {
                                         Task {
                                             await realtimeVM.startStreaming()
@@ -159,7 +188,6 @@ struct MainView: View {
                                         isTranscriptExpanded = true
                                         isSummaryExpanded = true
                                     }
-                                    // ストリーミング停止、テキストクリア
                                     realtimeVM.stopStreaming()
                                     viewModel.setRealtimeAudioCallback(nil)
                                     realtimeVM.finalText = ""
@@ -169,11 +197,7 @@ struct MainView: View {
                                     realtimeTranslationVM.reset()
                                 }
                             }
-                    }
-
-                    // レベルメーター（画面録画以外）
-                    if !viewModel.selectedAudioSource.isScreenRecording {
-                        levelGauge(level: (viewModel.isCapturingSystemAudio || viewModel.isRecordingScreen) ? viewModel.captureAudioLevel : viewModel.previewAudioLevel)
+                        Spacer()
                     }
 
                     // 画面プレビュー（画面録画中のみ）

@@ -45,6 +45,11 @@ class AppViewModel: ObservableObject {
     /// エラーメッセージ（nil の場合はエラーなし）
     @Published var errorMessage: String?
 
+    // MARK: - ファイル分割設定
+
+    /// ファイル分割間隔（分）。1〜60、デフォルト30分
+    @Published var splitIntervalMinutes: Int = 30
+
     // MARK: - ファイルリスト（複数ファイル文字起こし用）
 
     /// 音声文字起こし用のファイルリスト
@@ -751,7 +756,7 @@ class AppViewModel: ObservableObject {
         fileList.removeAll()
         await stopLevelPreview()
         do {
-            try await systemAudioCapture.startCapture(sourceType: selectedAudioSource)
+            try await systemAudioCapture.startCapture(sourceType: selectedAudioSource, splitInterval: TimeInterval(splitIntervalMinutes * 60))
             isCapturingSystemAudio = true
             isStartingCapture = false
         } catch let error as AppError {

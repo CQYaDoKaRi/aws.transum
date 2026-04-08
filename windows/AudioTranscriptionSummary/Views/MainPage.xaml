@@ -31,12 +31,21 @@
                         </Border>
                     </Expander.Header>
                     <StackPanel Spacing="8" Padding="8">
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+                            <ComboBox x:Name="AudioSourcePicker" DisplayMemberPath="Name" Grid.Column="0" MinWidth="200" />
+                            <ProgressBar x:Name="LevelMeter" Maximum="1" Value="0" Height="8" Grid.Column="1" Margin="8,0,0,0" VerticalAlignment="Center" />
+                        </Grid>
                         <StackPanel Orientation="Horizontal" Spacing="8">
-                            <ComboBox x:Name="AudioSourcePicker" DisplayMemberPath="Name" />
+                            <TextBlock Text="ファイル分割" FontSize="12" VerticalAlignment="Center" Foreground="{ThemeResource SystemControlForegroundBaseMediumBrush}" />
+                            <ComboBox x:Name="SplitIntervalCombo" Width="100" />
+                        </StackPanel>
+                        <StackPanel Orientation="Horizontal" Spacing="8">
                             <ToggleSwitch x:Name="RealtimeToggle" OnContent="リアルタイム文字起こし" OffContent="リアルタイム文字起こし" Toggled="OnRealtimeToggled" VerticalAlignment="Center" />
                         </StackPanel>
-                        <TextBlock Text="音声レベル" FontSize="12" />
-                        <ProgressBar x:Name="LevelMeter" Maximum="1" Value="0" Height="8" />
                     </StackPanel>
                 </Expander>
 

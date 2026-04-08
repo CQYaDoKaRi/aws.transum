@@ -69,7 +69,7 @@ final class SystemAudioCapture: NSObject, @unchecked Sendable {
 
     /// 指定された音源でキャプチャを開始する
     /// - Parameter sourceType: 音源種別（デフォルト: システム全体）
-    func startCapture(sourceType: AudioSourceType = .systemAudio) async throws {
+    func startCapture(sourceType: AudioSourceType = .systemAudio, splitInterval: TimeInterval = 1800) async throws {
         guard !isCapturing else { return }
         currentSourceType = sourceType
 
@@ -79,8 +79,8 @@ final class SystemAudioCapture: NSObject, @unchecked Sendable {
         }
         let dateStr = Self.fileNameFormatter.string(from: Date())
 
-        // SplitRecordingManager を初期化（1分分割）
-        let manager = SplitRecordingManager(baseName: dateStr, outputDirectory: saveDir)
+        // SplitRecordingManager を初期化
+        let manager = SplitRecordingManager(baseName: dateStr, outputDirectory: saveDir, splitInterval: splitInterval)
         splitManager = manager
 
         // 最初の分割ファイル URL を取得

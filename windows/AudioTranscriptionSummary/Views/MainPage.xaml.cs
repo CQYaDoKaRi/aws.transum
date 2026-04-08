@@ -89,7 +89,6 @@ public sealed partial class MainPage : Page
 
         // Bind audio sources
         AudioSourcePicker.ItemsSource = _vm.AudioSources;
-        // Select System Audio by default
         var loopbackIdx = _vm.AudioSources.FindIndex(s => s.IsLoopback);
         AudioSourcePicker.SelectedIndex = loopbackIdx >= 0 ? loopbackIdx : 0;
 
@@ -97,6 +96,17 @@ public sealed partial class MainPage : Page
         {
             if (AudioSourcePicker.SelectedItem is AudioSourceInfo src)
                 _vm.SelectedSource = src;
+        };
+
+        // ファイル分割時間 ComboBox 初期化
+        var splitOptions = new[] { 1, 5, 10, 15, 20, 30, 45, 60 };
+        foreach (var min in splitOptions)
+            SplitIntervalCombo.Items.Add($"{min}分");
+        SplitIntervalCombo.SelectedIndex = Array.IndexOf(splitOptions, 30); // デフォルト30分
+        SplitIntervalCombo.SelectionChanged += (_, _) =>
+        {
+            if (SplitIntervalCombo.SelectedIndex >= 0 && SplitIntervalCombo.SelectedIndex < splitOptions.Length)
+                _vm.SplitIntervalMinutes = splitOptions[SplitIntervalCombo.SelectedIndex];
         };
 
         // Task 7.1: Hide realtime section when disabled
@@ -154,6 +164,12 @@ public sealed partial class MainPage : Page
                     TranscriptionLangCombo.IsEnabled = (_vm.AudioFile != null || _vm.FileList.Count > 0) && !_vm.IsTranscribing;
                     SummaryFileBtn.IsEnabled = !_vm.IsTranscribing && !_vm.IsSummarizing;
                     ResummarizeBtn.IsEnabled = !_vm.IsTranscribing && !_vm.IsSummarizing;
+                    // 文字起こし開始時に入力・リアルタイムを折りたたむ
+                    if (_vm.IsTranscribing)
+                    {
+                        InputSection.IsExpanded = false;
+                        RealtimeSection.IsExpanded = false;
+                    }
                     break;
                 case nameof(MainViewModel.IsSummarizing):
                     SummaryFileBtn.IsEnabled = !_vm.IsSummarizing && !_vm.IsTranscribing;
